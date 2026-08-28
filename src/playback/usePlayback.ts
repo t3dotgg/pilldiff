@@ -14,6 +14,7 @@ import {
   createSession,
   firstTrack,
   queuePosition,
+  snapshotPlaylist,
   trackAtOffset,
   unavailableOutcome,
 } from './queue';
@@ -63,9 +64,10 @@ export function usePlayback(
   soundCloudHostRef: RefObject<HTMLDivElement | null>,
 ): PlaybackControls {
   const [session, setSession] = useState<PlaybackSession>();
+  const [activePlaylist, setActivePlaylist] = useState<Playlist>();
   const [controllerVersion, setControllerVersion] = useState(0);
   const sessionRef = useRef<PlaybackSession | undefined>(undefined);
-  const playlistsRef = useRef(playlists);
+  const activePlaylistRef = useRef<Playlist | undefined>(undefined);
   const controllersRef = useRef<Controllers | undefined>(undefined);
   const generationRef = useRef(0);
   const handledEndGenerationRef = useRef<number | undefined>(undefined);
@@ -74,8 +76,6 @@ export function usePlayback(
   const eventHandlerRef = useRef<(event: ProviderEvent) => void>(() => undefined);
   const advanceRef = useRef<(offset: number, forcePlay: boolean) => void>(() => undefined);
   const unavailableRef = useRef<(message: string) => void>(() => undefined);
-
-  playlistsRef.current = playlists;
 
   const updateSession = useCallback(
     (updater: (current: PlaybackSession) => PlaybackSession) => {
@@ -91,7 +91,10 @@ export function usePlayback(
   );
 
   const findPlaylist = useCallback(
-    (playlistId: string) => playlistsRef.current.find((item) => item.id === playlistId),
+    (playlistId: string) => {
+      const playlist = activePlaylistRef.current;
+      return playlist?.id === playlistId ? playlist : undefined;
+    },
     [],
   );
 
@@ -329,15 +332,17 @@ export function usePlayback(
   }, [soundCloudHostRef, youtubeHostRef]);
 
   useEffect(() => {
-    if (!controllerVersion || !controllersRef.current || playlists.length === 0) {
+    if (!controllerVersion || !controllersRef.current) {
       return;
     }
     if (initializedControllerVersionRef.current === controllerVersion) {
       return;
     }
-    initializedControllerVersionRef.current = controllerVersion;
+    const latestPlaylist = activePlaylistRef.current ?? playlists[0];
+    if (!latestPlaylist) {
+      return;
+    }
     const restored = sessionRef.current ?? restorePlayback(playlists);
-    const latestPlaylist = playlists[0];
     const defaultTrack = firstTrack(latestPlaylist, 'original');
     const initial =
       restored ??
@@ -347,11 +352,16 @@ export function usePlayback(
     if (!initial) {
       return;
     }
-    const playlist = playlists.find((item) => item.id === initial.playlistId) ?? latestPlaylist;
+    const playlist = activePlaylistRef.current ?? snapshotPlaylist(
+      playlists.find((item) => item.id === initial.playlistId) ?? latestPlaylist,
+    );
     const track = playlist.tracks.find((item) => item.id === initial.trackId) ?? firstTrack(playlist, initial.order);
     if (!track) {
       return;
     }
+    initializedControllerVersionRef.current = controllerVersion;
+    activePlaylistRef.current = playlist;
+    setActivePlaylist(playlist);
     const normalized =
       initial.playlistId === playlist.id && initial.trackId === track.id
         ? initial
@@ -364,7 +374,7 @@ export function usePlayback(
       autoplay: false,
       progress: normalized.progress,
     });
-  }, [controllerVersion, loadTrack]);
+  }, [controllerVersion, loadTrack, playlists]);
 
   useEffect(() => {
     if (session) {
@@ -374,17 +384,20 @@ export function usePlayback(
 
   const startPlaylist = useCallback(
     (playlist: Playlist, order: PlaybackOrder, trackId?: string) => {
+      const snapshot = snapshotPlaylist(playlist);
       const track =
-        playlist.tracks.find((item) => item.id === trackId) ?? firstTrack(playlist, order);
+        snapshot.tracks.find((item) => item.id === trackId) ?? firstTrack(snapshot, order);
       if (!track) {
         return;
       }
       const volume = sessionRef.current?.volume ?? 0.78;
       failedTrackIdsRef.current.clear();
-      const nextSession = createSession(playlist, order, track.id, volume, true);
+      activePlaylistRef.current = snapshot;
+      setActivePlaylist(snapshot);
+      const nextSession = createSession(snapshot, order, track.id, volume, true);
       sessionRef.current = nextSession;
       setSession(nextSession);
-      void loadTrack(playlist, track, { autoplay: true });
+      void loadTrack(snapshot, track, { autoplay: true });
     },
     [loadTrack],
   );
@@ -500,9 +513,8 @@ export function usePlayback(
 
   const skipCurrent = useCallback(() => advance(1, true), [advance]);
 
-  const playingPlaylist = session
-    ? playlists.find((playlist) => playlist.id === session.playlistId)
-    : undefined;
+  const playingPlaylist =
+    session && activePlaylist?.id === session.playlistId ? activePlaylist : undefined;
   const currentTrack = playingPlaylist?.tracks.find((track) => track.id === session?.trackId);
   const position =
     session && playingPlaylist

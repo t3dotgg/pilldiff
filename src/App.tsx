@@ -68,7 +68,7 @@ function MusicWorkspace({
   const selectedPlaylist =
     playlists.find((playlist) => playlist.id === selectedPlaylistId) ?? playlists[0];
   const selectedOrder =
-    playback.session?.playlistId === selectedPlaylist?.id
+    playback.session && playback.session.playlistId === selectedPlaylist?.id
       ? playback.session.order
       : browseOrders[selectedPlaylist?.id ?? ''] ?? 'original';
 
@@ -115,19 +115,6 @@ function MusicWorkspace({
     setCategory('');
   };
 
-  if (!selectedPlaylist) {
-    return (
-      <div className="empty-catalog">
-        <AppMark />
-        <h1>The archive is quiet.</h1>
-        <p>No posts with supported YouTube or SoundCloud sources were found.</p>
-        <button className="primary-button" type="button" onClick={onRefresh} disabled={refreshing}>
-          <RefreshCw size={17} className={refreshing ? 'spin' : ''} /> Refresh archive
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -163,7 +150,7 @@ function MusicWorkspace({
       <div className="workspace">
         <Archive
           playlists={playlists}
-          selectedPlaylistId={selectedPlaylist.id}
+          selectedPlaylistId={selectedPlaylist?.id ?? ''}
           search={search}
           year={year}
           category={category}
@@ -174,21 +161,33 @@ function MusicWorkspace({
           onSelect={(playlistId) => {
             setSelectedPlaylistId(playlistId);
             setArchiveOpen(false);
+            window.scrollTo({ top: 0, behavior: 'instant' });
           }}
           onClose={() => setArchiveOpen(false)}
           onClear={clearFilters}
         />
         <main className="listening-room">
-          <PlaylistView
-            playlist={selectedPlaylist}
-            order={selectedOrder}
-            session={playback.session}
-            currentTrack={playback.currentTrack}
-            onOrder={handleOrder}
-            onPlayPlaylist={() => playback.startPlaylist(selectedPlaylist, selectedOrder)}
-            onPlayTrack={(trackId) => playback.startPlaylist(selectedPlaylist, selectedOrder, trackId)}
-            onTogglePlay={playback.togglePlay}
-          />
+          {selectedPlaylist ? (
+            <PlaylistView
+              playlist={selectedPlaylist}
+              order={selectedOrder}
+              session={playback.session}
+              currentTrack={playback.currentTrack}
+              onOrder={handleOrder}
+              onPlayPlaylist={() => playback.startPlaylist(selectedPlaylist, selectedOrder)}
+              onPlayTrack={(trackId) => playback.startPlaylist(selectedPlaylist, selectedOrder, trackId)}
+              onTogglePlay={playback.togglePlay}
+            />
+          ) : (
+            <div className="empty-catalog">
+              <AppMark />
+              <h1>The archive is quiet.</h1>
+              <p>No posts with supported YouTube or SoundCloud sources were found.</p>
+              <button className="primary-button" type="button" onClick={onRefresh} disabled={refreshing}>
+                <RefreshCw size={17} className={refreshing ? 'spin' : ''} /> Refresh archive
+              </button>
+            </div>
+          )}
           <EmbedStage
             session={playback.session}
             track={playback.currentTrack}

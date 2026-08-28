@@ -8,6 +8,7 @@ import {
   firstTrack,
   orderedTracks,
   queuePosition,
+  snapshotPlaylist,
   trackAtOffset,
   unavailableOutcome,
 } from '../src/playback/queue';
@@ -39,6 +40,58 @@ const playlist: Playlist = {
   tracks: [makeTrack('rank-50', 50), makeTrack('rank-49', 49), makeTrack('rank-1', 1)],
   skipped: { bandcamp: 0, other: 0 },
 };
+
+test('active playlist snapshots freeze independent metadata and track copies', () => {
+  const snapshot = snapshotPlaylist(playlist);
+
+  assert.deepEqual(snapshot, playlist);
+  assert.notEqual(snapshot, playlist);
+  assert.notEqual(snapshot.tracks, playlist.tracks);
+  assert.notEqual(snapshot.tracks[0], playlist.tracks[0]);
+  assert.notEqual(snapshot.skipped, playlist.skipped);
+  assert.equal(Object.isFrozen(snapshot), true);
+  assert.equal(Object.isFrozen(snapshot.tracks), true);
+  assert.equal(snapshot.tracks.every((track) => Object.isFrozen(track)), true);
+  assert.equal(Object.isFrozen(snapshot.skipped), true);
+  assert.equal(Object.isFrozen(playlist), false);
+  assert.equal(Object.isFrozen(playlist.tracks[0]), false);
+});
+
+test('catalog changes do not alter a captured queue or its traversal', () => {
+  const source: Playlist = {
+    ...playlist,
+    tracks: playlist.tracks.map((track) => ({ ...track })),
+    skipped: { ...playlist.skipped },
+  };
+  const catalog = [source];
+  const snapshot = snapshotPlaylist(source);
+  const session = createSession(snapshot, 'original', 'rank-50', 0.7, true, 42);
+
+  source.title = 'Updated countdown';
+  source.tracks[0].title = 'Replacement track';
+  source.tracks[0].provider = 'soundcloud';
+  source.tracks[0].playbackUrl = 'https://example.com/replacement';
+  source.tracks.splice(1, 1);
+  source.skipped.bandcamp = 3;
+
+  const freshSnapshot = snapshotPlaylist(source);
+  catalog.splice(0);
+
+  assert.deepEqual(snapshot, playlist);
+  assert.equal(catalog.length, 0);
+  assert.equal(snapshot.tracks[0].provider, 'youtube');
+  assert.equal(trackAtOffset(snapshot, session.order, session.trackId, 1)?.id, 'rank-49');
+  assert.equal(canStep(snapshot, session.order, session.trackId, -1), false);
+  assert.deepEqual(queuePosition(snapshot, session.order, session.trackId), { index: 0, total: 3 });
+  const reversed = changeSessionOrder(session, 'reverse');
+  assert.equal(reversed.trackId, 'rank-50');
+  assert.equal(reversed.progress, 42);
+  assert.equal(trackAtOffset(snapshot, reversed.order, reversed.trackId, -1)?.id, 'rank-49');
+  assert.equal(canStep(snapshot, reversed.order, reversed.trackId, 1), false);
+  assert.equal(freshSnapshot.title, 'Updated countdown');
+  assert.equal(freshSnapshot.tracks[0].title, 'Replacement track');
+  assert.equal(freshSnapshot.tracks.length, 2);
+});
 
 test('orders entries by blog order or reversed blog order', () => {
   assert.deepEqual(

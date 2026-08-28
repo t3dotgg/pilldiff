@@ -1,6 +1,16 @@
 import type { PlaybackOrder, Playlist, Track } from '../../shared/types';
 import type { PlaybackSession } from './types';
 
+export function snapshotPlaylist(playlist: Playlist): Playlist {
+  const tracks = playlist.tracks.map((track) => Object.freeze({ ...track }));
+  Object.freeze(tracks);
+  return Object.freeze({
+    ...playlist,
+    tracks,
+    skipped: Object.freeze({ ...playlist.skipped }),
+  });
+}
+
 export function orderedTracks(playlist: Playlist, order: PlaybackOrder): Track[] {
   return order === 'original' ? playlist.tracks : [...playlist.tracks].reverse();
 }
