@@ -71,6 +71,7 @@ interface MediaEvent {
   joinsNextAnchor: boolean;
   media: ParsedMedia;
   label: string;
+  directLabel?: string;
   rank?: number;
   attribution?: { label: string; sourceUrl: string };
 }
@@ -437,6 +438,7 @@ function extractMediaEvents(document: CheerioAPI): { events: MediaEvent[]; bandc
     if (type === 'anchor' && !isCuratedAnchor(block, node, localRank)) return;
     const attribution = type === 'iframe' ? findAttribution(document, elementOrder, order, media.provider) : undefined;
     const contextualLabel = inferLabel('', blockText, contexts);
+    const directLabel = type === 'anchor' ? stripRank(normalizeText(node.text())) : undefined;
     const label = type === 'anchor'
       ? inferLabel(node.text(), blockText, contexts)
       : stripRank(contextualLabel || attribution?.label || '');
@@ -448,6 +450,7 @@ function extractMediaEvents(document: CheerioAPI): { events: MediaEvent[]; bandc
       joinsNextAnchor: type === 'anchor' && element.nextSibling?.type === 'tag' && element.nextSibling.tagName.toLowerCase() === 'a',
       media,
       label,
+      directLabel,
       rank,
       attribution,
     });
@@ -463,7 +466,80 @@ function extractMediaEvents(document: CheerioAPI): { events: MediaEvent[]; bandc
   return { events, bandcamp, other, skippedSources };
 }
 
+function pairSharedEntryMedia(events: MediaEvent[]): Map<MediaEvent, MediaEvent> {
+  const groups = new Map<string, MediaEvent[]>();
+  for (const event of events) {
+    if (event.rank === undefined) continue;
+    const key = `${event.blockOrder}:${event.rank}`;
+    groups.set(key, [...(groups.get(key) ?? []), event]);
+  }
+
+  const pairs = new Map<MediaEvent, MediaEvent>();
+  for (const group of groups.values()) {
+    const anchors = group.filter((event) => event.type === 'anchor');
+    const iframes = group.filter((event) => event.type === 'iframe');
+    if (anchors.length < 2 || anchors.length !== iframes.length) continue;
+
+    const titledAnchors = anchors.filter((event) => {
+      const label = event.directLabel ?? '';
+      return label && isLabelLike(label) && !isSectionLabel(label) && !isPlatformOnlyLabel(label);
+    });
+    const distinctLabels = new Set(titledAnchors.map((event) => event.directLabel?.toLocaleLowerCase()));
+    const distinctMedia = new Set(anchors.map((event) => `${event.media.provider}:${event.media.fingerprint}`));
+    const distinctEmbeds = new Set(iframes.map((event) => `${event.media.provider}:${event.media.fingerprint}`));
+    if (
+      titledAnchors.length !== anchors.length
+      || distinctLabels.size < 2
+      || distinctMedia.size !== anchors.length
+      || distinctEmbeds.size !== iframes.length
+    ) continue;
+
+    const unmatchedAnchors = new Set(anchors);
+    const unmatchedIframes = new Set(iframes);
+    const groupPairs = new Map<MediaEvent, MediaEvent>();
+    for (const anchor of anchors) {
+      const strongMatches = [...unmatchedIframes].filter((iframe) => (
+        iframe.media.fingerprint === anchor.media.fingerprint
+        || iframe.attribution?.sourceUrl === anchor.media.sourceUrl
+      ));
+      if (strongMatches.length !== 1) continue;
+      groupPairs.set(anchor, strongMatches[0]);
+      unmatchedAnchors.delete(anchor);
+      unmatchedIframes.delete(strongMatches[0]);
+    }
+
+    const mediaKeys = new Set([...unmatchedAnchors].map((event) => `${event.media.provider}:${event.media.kind}`));
+    for (const mediaKey of mediaKeys) {
+      const matchingAnchors = [...unmatchedAnchors]
+        .filter((event) => `${event.media.provider}:${event.media.kind}` === mediaKey)
+        .sort((left, right) => left.order - right.order);
+      const matchingIframes = [...unmatchedIframes]
+        .filter((event) => `${event.media.provider}:${event.media.kind}` === mediaKey)
+        .sort((left, right) => left.order - right.order);
+      if (matchingAnchors.length === 0 || matchingAnchors.length !== matchingIframes.length) continue;
+      const soundCloudSlugToNumeric = matchingAnchors.every((anchor, index) => {
+        const iframe = matchingIframes[index];
+        const anchorNumeric = new RegExp(`^${anchor.media.kind}:\\d+$`).test(anchor.media.fingerprint);
+        const iframeNumeric = new RegExp(`^${iframe.media.kind}:\\d+$`).test(iframe.media.fingerprint);
+        return anchor.media.provider === 'soundcloud'
+          && iframe.media.provider === 'soundcloud'
+          && anchorNumeric !== iframeNumeric;
+      });
+      if (!soundCloudSlugToNumeric) continue;
+      for (let index = 0; index < matchingAnchors.length; index += 1) {
+        groupPairs.set(matchingAnchors[index], matchingIframes[index]);
+        unmatchedAnchors.delete(matchingAnchors[index]);
+        unmatchedIframes.delete(matchingIframes[index]);
+      }
+    }
+    if (unmatchedAnchors.size > 0 || unmatchedIframes.size > 0) continue;
+    for (const [anchor, iframe] of groupPairs) pairs.set(anchor, iframe);
+  }
+  return pairs;
+}
+
 function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank: boolean): TrackSelection[] {
+  const sharedEntryPairs = pairSharedEntryMedia(events);
   const normalizedEvents: MediaEvent[] = [];
   for (let index = 0; index < events.length; index += 1) {
     let event = events[index];
@@ -481,6 +557,8 @@ function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank
         )
       )
       && (event.rank === duplicateAnchor.rank || event.rank === undefined || duplicateAnchor.rank === undefined)
+      && !sharedEntryPairs.has(event)
+      && !sharedEntryPairs.has(duplicateAnchor)
     ) {
       const firstLabel = stripRank(event.label);
       const secondLabel = stripRank(duplicateAnchor.label);
@@ -498,6 +576,7 @@ function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank
   const selections: TrackSelection[] = [];
   const representedRanks = new Set<number>();
   const rankedAnchors = normalizedEvents.filter((event) => event.type === 'anchor' && event.rank !== undefined);
+  const pairedIframes = new Set(sharedEntryPairs.values());
   const firstRankedOrder = rankedAnchors[0]?.order;
   const lastRankedOrder = rankedAnchors.at(-1)?.order;
 
@@ -534,15 +613,33 @@ function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank
       && (event.order < firstRankedOrder || event.order > lastRankedOrder);
     if (event.type === 'iframe' && event.media.kind === 'playlist' && outsideRankedList) continue;
     if (event.type === 'iframe') {
+      if (pairedIframes.has(event)) continue;
       appendTrack(event, event.label, event.rank, event.attribution?.sourceUrl ?? event.media.sourceUrl);
+      continue;
+    }
+
+    const sharedEntryIframe = sharedEntryPairs.get(event);
+    if (sharedEntryIframe) {
+      const sourceUrl = sharedEntryIframe.media.provider === event.media.provider
+        ? event.media.sourceUrl
+        : sharedEntryIframe.attribution?.sourceUrl ?? sharedEntryIframe.media.sourceUrl;
+      appendTrack(
+        sharedEntryIframe,
+        event.directLabel ?? event.label,
+        event.rank ?? sharedEntryIframe.rank,
+        sourceUrl,
+        sharedEntryIframe.nodes,
+      );
       continue;
     }
 
     let pairedIframeIndex = -1;
     for (let candidateIndex = index + 1; candidateIndex < normalizedEvents.length; candidateIndex += 1) {
       const candidate = normalizedEvents[candidateIndex];
+      if (candidate.type === 'anchor' && sharedEntryPairs.has(candidate)) break;
       if (candidate.type === 'anchor' && candidate.rank !== undefined && event.rank !== undefined && candidate.rank !== event.rank) break;
       if (candidate.type !== 'iframe') continue;
+      if (pairedIframes.has(candidate)) continue;
       const sameRank = event.rank !== undefined && candidate.rank === event.rank;
       const sameMedia = event.media.fingerprint === candidate.media.fingerprint;
       const matchingAttribution = candidate.attribution?.sourceUrl === event.media.sourceUrl;

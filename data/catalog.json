@@ -4,7 +4,7 @@
     "title": "billdifferen",
     "url": "https://billdifferen.blogspot.com/"
   },
-  "fetchedAt": "2026-08-28T08:14:00.821Z",
+  "fetchedAt": "2026-08-28T10:08:24.520Z",
   "totalPosts": 40,
   "playlists": [
     {
@@ -5145,9 +5145,9 @@
         {
           "id": "19ba6938fb86df849711",
           "provider": "soundcloud",
-          "title": "snoa- Agenda [Olswel] / hear me now [444jet, chinapoet]",
+          "title": "snoa- Agenda [Olswel]",
           "artist": "",
-          "label": "snoa- Agenda [Olswel] / hear me now [444jet, chinapoet]",
+          "label": "snoa- Agenda [Olswel]",
           "sourceUrl": "https://soundcloud.com/snoa247/agenda-prod-olswel",
           "playbackUrl": "https://api.soundcloud.com/tracks/2099816094",
           "rank": 3,
@@ -5157,10 +5157,10 @@
         {
           "id": "92a97c201d809e8747bf",
           "provider": "soundcloud",
-          "title": "snoa- Agenda [Olswel] / hear me now [444jet, chinapoet]",
+          "title": "hear me now [444jet, chinapoet]",
           "artist": "",
-          "label": "snoa- Agenda [Olswel] / hear me now [444jet, chinapoet]",
-          "sourceUrl": "https://api.soundcloud.com/tracks/2128892289",
+          "label": "hear me now [444jet, chinapoet]",
+          "sourceUrl": "https://soundcloud.com/snoa247/hearmenow",
           "playbackUrl": "https://api.soundcloud.com/tracks/2128892289",
           "rank": 3,
           "position": 51,

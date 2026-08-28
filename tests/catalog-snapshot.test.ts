@@ -24,6 +24,7 @@ test('checked seed retains audited live archive coverage', async () => {
   const april = byTitle.get("billdifferen's favorite music of april 2026 (plus march & april albums)");
   const february = byTitle.get("billdifferen's favorite music of february 2026");
   const late2025 = byTitle.get("billdifferen's top 100 songs of 2025 (part 1: 100-51)");
+  const final2025 = byTitle.get("billdifferen's top 100 songs of 2025 (part 1: 50-1)");
   const jersey = byTitle.get("billdifferen's top 100 jersey club tunes of 2024");
   const funk = byTitle.get("billdifferen's top 100 funk songs of 2024");
   const starterKit = byTitle.get("billdifferen's #JerseyClub Starter Kit 2k24");
@@ -39,6 +40,7 @@ test('checked seed retains audited live archive coverage', async () => {
   assert.equal(april?.tracks.length, 50);
   assert.equal(february?.tracks.length, 51);
   assert.equal(late2025?.tracks.length, 52);
+  assert.equal(final2025?.tracks.length, 52);
   assert.equal(jersey?.tracks.length, 100);
   assert.equal(funk?.tracks.length, 100);
   assert.equal(starterKit?.tracks.length, 90);
@@ -54,6 +56,34 @@ test('checked seed retains audited live archive coverage', async () => {
   assert.deepEqual(
     baileFunk?.tracks.map((track) => track.rank),
     Array.from({ length: 99 }, (unusedValue, index) => 99 - index).filter((rank) => ![85, 75, 69, 40, 21].includes(rank)),
+  );
+  assert.deepEqual(
+    final2025?.tracks.filter((track) => track.rank === 3).map((track) => ({
+      id: track.id,
+      label: track.label,
+      sourceUrl: track.sourceUrl,
+      playbackUrl: track.playbackUrl,
+      rank: track.rank,
+      position: track.position,
+    })),
+    [
+      {
+        id: '19ba6938fb86df849711',
+        label: 'snoa- Agenda [Olswel]',
+        sourceUrl: 'https://soundcloud.com/snoa247/agenda-prod-olswel',
+        playbackUrl: 'https://api.soundcloud.com/tracks/2099816094',
+        rank: 3,
+        position: 50,
+      },
+      {
+        id: '92a97c201d809e8747bf',
+        label: 'hear me now [444jet, chinapoet]',
+        sourceUrl: 'https://soundcloud.com/snoa247/hearmenow',
+        playbackUrl: 'https://api.soundcloud.com/tracks/2128892289',
+        rank: 3,
+        position: 51,
+      },
+    ],
   );
   assert.deepEqual(
     baileFunk?.tracks.filter((track) => track.rank === 98).map((track) => ({

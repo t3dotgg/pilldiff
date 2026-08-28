@@ -47,6 +47,162 @@ test('pairs a cross-provider heading and embed as one ranked entry', () => {
   assert.equal(playlist.tracks[0].playbackUrl, 'https://api.soundcloud.com/tracks/2362510124');
 });
 
+test('pairs distinct SoundCloud songs inside one ranked Blogger heading', () => {
+  const earlierTracks = Array.from({ length: 49 }, (unusedValue, index) => {
+    const rank = 52 - index;
+    return `<h1>${rank}. <a href="https://soundcloud.com/artist/song-${rank}">Artist - Song ${rank}</a></h1>`;
+  }).join('');
+  const playlist = parsePost(entry("billdifferen's top 100 songs of 2025 (part 1: 50-1)", `
+    ${earlierTracks}
+    <h1>
+      3.
+      <a href="https://soundcloud.com/snoa247/agenda-prod-olswel">snoa- Agenda [Olswel]</a>
+      /
+      <a href="https://soundcloud.com/snoa247/hearmenow">hear me now [444jet, chinapoet]</a>
+      <iframe src="https://w.soundcloud.com/player/?url=https%3A%2F%2Fapi.soundcloud.com%2Ftracks%2Fsoundcloud%253Atracks%253A2099816094"></iframe>
+      <div style="color: #cccccc; font-size: 10px"></div>
+      <div style="color: #cccccc; font-size: 10px"></div>
+      <iframe src="https://w.soundcloud.com/player/?url=https%3A%2F%2Fapi.soundcloud.com%2Ftracks%2Fsoundcloud%253Atracks%253A2128892289"></iframe>
+    </h1>
+    <p>Two sides of the same late-night thought.</p>
+    <h1>2. <a href="https://losthuthanaka.bandcamp.com/track/parrandita-sariri-tunupa-4">Los Thuthanaka - Parrandita “Sariri Tunupa”</a></h1>
+  `, '4187003885016673397'));
+  assert.ok(playlist);
+  assert.equal(playlist.tracks.length, 51);
+  assert.equal(playlist.skipped.bandcamp, 1);
+  assert.deepEqual(
+    playlist.tracks.slice(-2).map((track) => ({
+      id: track.id,
+      label: track.label,
+      sourceUrl: track.sourceUrl,
+      playbackUrl: track.playbackUrl,
+      rank: track.rank,
+      position: track.position,
+      description: track.description,
+    })),
+    [
+      {
+        id: '19ba6938fb86df849711',
+        label: 'snoa- Agenda [Olswel]',
+        sourceUrl: 'https://soundcloud.com/snoa247/agenda-prod-olswel',
+        playbackUrl: 'https://api.soundcloud.com/tracks/2099816094',
+        rank: 3,
+        position: 50,
+        description: 'Two sides of the same late-night thought.',
+      },
+      {
+        id: '92a97c201d809e8747bf',
+        label: 'hear me now [444jet, chinapoet]',
+        sourceUrl: 'https://soundcloud.com/snoa247/hearmenow',
+        playbackUrl: 'https://api.soundcloud.com/tracks/2128892289',
+        rank: 3,
+        position: 51,
+        description: 'Two sides of the same late-night thought.',
+      },
+    ],
+  );
+});
+
+test('prefers exact media identity when shared-entry embeds are reversed', () => {
+  const playlist = parsePost(entry("billdifferen's top songs of 2024", `
+    <h1>
+      1.
+      <a href="https://www.youtube.com/watch?v=0VNQ4GemnCY">Artist - First / Reprise</a>
+      /
+      <a href="https://www.youtube.com/watch?v=qjIIxuV6DS0">Artist - Second</a>
+      <iframe src="https://www.youtube.com/embed/qjIIxuV6DS0"></iframe>
+      <iframe src="https://www.youtube.com/embed/0VNQ4GemnCY"></iframe>
+    </h1>
+  `));
+  assert.ok(playlist);
+  assert.deepEqual(
+    playlist.tracks.map((track) => ({ label: track.label, sourceUrl: track.sourceUrl, playbackUrl: track.playbackUrl, rank: track.rank })),
+    [
+      {
+        label: 'Artist - First / Reprise',
+        sourceUrl: 'https://www.youtube.com/watch?v=0VNQ4GemnCY',
+        playbackUrl: 'https://www.youtube.com/embed/0VNQ4GemnCY',
+        rank: 1,
+      },
+      {
+        label: 'Artist - Second',
+        sourceUrl: 'https://www.youtube.com/watch?v=qjIIxuV6DS0',
+        playbackUrl: 'https://www.youtube.com/embed/qjIIxuV6DS0',
+        rank: 1,
+      },
+    ],
+  );
+});
+
+test('keeps every embed when a shared-entry group cannot pair completely', () => {
+  const playlist = parsePost(entry("billdifferen's top songs of 2024", `
+    <h1>
+      3.
+      <a href="https://soundcloud.com/artist/first">Artist - First</a>
+      /
+      <a href="https://www.youtube.com/watch?v=0VNQ4GemnCY">Artist - Second</a>
+      /
+      <a href="https://soundcloud.com/artist/third">Artist - Third</a>
+      <iframe src="https://w.soundcloud.com/player/?url=https%3A%2F%2Fapi.soundcloud.com%2Ftracks%2F2099816094"></iframe>
+      <iframe src="https://www.youtube.com/embed/0VNQ4GemnCY"></iframe>
+    </h1>
+  `));
+  assert.ok(playlist);
+  assert.equal(playlist.tracks.length, 2);
+  assert.deepEqual(playlist.tracks.map((track) => track.playbackUrl), [
+    'https://api.soundcloud.com/tracks/2099816094',
+    'https://www.youtube.com/embed/0VNQ4GemnCY',
+  ]);
+});
+
+test('stops legacy pairing before a complete nested shared-entry group', () => {
+  const playlist = parsePost(entry("billdifferen's top songs of 2024", `
+    <div>
+      3. <a href="https://soundcloud.com/artist/outer">Artist - Outer</a>
+      <h1>
+        3.
+        <a href="https://www.youtube.com/watch?v=0VNQ4GemnCY">Artist - First</a>
+        /
+        <a href="https://www.youtube.com/watch?v=qjIIxuV6DS0">Artist - Second</a>
+        <iframe src="https://www.youtube.com/embed/0VNQ4GemnCY"></iframe>
+        <iframe src="https://www.youtube.com/embed/qjIIxuV6DS0"></iframe>
+      </h1>
+      <iframe src="https://w.soundcloud.com/player/?url=https%3A%2F%2Fapi.soundcloud.com%2Ftracks%2F300"></iframe>
+    </div>
+  `));
+  assert.ok(playlist);
+  assert.equal(playlist.tracks.length, 4);
+  assert.deepEqual(playlist.tracks.map((track) => track.playbackUrl), [
+    'https://soundcloud.com/artist/outer',
+    'https://www.youtube.com/embed/0VNQ4GemnCY',
+    'https://www.youtube.com/embed/qjIIxuV6DS0',
+    'https://api.soundcloud.com/tracks/300',
+  ]);
+  assert.deepEqual(playlist.tracks.slice(1, 3).map((track) => track.label), [
+    'Artist - First',
+    'Artist - Second',
+  ]);
+});
+
+test('keeps immediately adjacent distinct anchors separate when both embeds match', () => {
+  const playlist = parsePost(entry("billdifferen's top songs of 2024", `
+    <h1>
+      3.
+      <a href="https://www.youtube.com/watch?v=0VNQ4GemnCY">Artist - First</a><a href="https://www.youtube.com/watch?v=qjIIxuV6DS0">Artist - Second</a>
+      <iframe src="https://www.youtube.com/embed/0VNQ4GemnCY"></iframe>
+      <iframe src="https://www.youtube.com/embed/qjIIxuV6DS0"></iframe>
+    </h1>
+  `));
+  assert.ok(playlist);
+  assert.deepEqual(
+    playlist.tracks.map((track) => ({ label: track.label, playbackUrl: track.playbackUrl })),
+    [
+      { label: 'Artist - First', playbackUrl: 'https://www.youtube.com/embed/0VNQ4GemnCY' },
+      { label: 'Artist - Second', playbackUrl: 'https://www.youtube.com/embed/qjIIxuV6DS0' },
+    ],
+  );
+});
+
 test('excludes contextual album links from a ranked song playlist', () => {
   const playlist = parsePost(entry('billdifferen\'s top songs of 2024', `
     <h2>Notable Releases: <a href="https://soundcloud.com/artist/sets/context-album">Context album</a></h2>
