@@ -67,6 +67,8 @@ The only optional runtime code is `/api/firecrawl`, a small Vercel function that
 
 ### Vercel
 
+Production target: [pilldiff.t3.gg](https://pilldiff.t3.gg/). The private source repository is [t3dotgg/pilldiff](https://github.com/t3dotgg/pilldiff), connected from `main` to the existing `theo-personal/pilldiff` Vercel project. Pushes to `main` automatically start a fresh Blogger import and production build.
+
 1. Push this repository to GitHub and import it as a Git-connected Vercel project.
 2. Vercel reads `vercel.json`, runs `npm run build` with Node 24, and publishes `dist`.
 3. Deploy once with no environment variables if automatic monitoring is not ready yet. The static player and build-time catalog need no credentials.
@@ -76,7 +78,7 @@ Every deployment imports the current Blogger feed. A failed import or validation
 
 ### Manual rebuild
 
-Create a Vercel deploy hook for the `main` branch under **Project Settings → Git → Deploy Hooks**. Add its full URL as the `VERCEL_DEPLOY_HOOK` secret in the GitHub repository, then use **Actions → Rebuild catalog → Run workflow** whenever an immediate import is needed. The workflow has no schedule and does not check out or rebuild the repository itself; it asks Vercel to build the current `main` branch. A green workflow means Vercel accepted the request, not that the deployment ultimately succeeded.
+Create a Vercel deploy hook for the `main` branch under **Project Settings → Git → Deploy Hooks**. Add its full URL as the `VERCEL_DEPLOY_HOOK` secret in the GitHub repository, then use **Actions → Rebuild catalog → Run workflow** whenever an immediate import is needed. The workflow has no schedule and does not check out or rebuild the repository itself; it asks Vercel to build the current `main` branch and import Blogger again. A green workflow means Vercel accepted the request; verify the resulting deployment in Vercel before treating the catalog as updated.
 
 The workflow must exist on the repository's default branch before GitHub exposes **Run workflow**. Treat the deploy-hook URL as a password: do not commit it or expose it to client code.
 
@@ -85,6 +87,8 @@ The workflow must exist on the repository's default branch before GitHub exposes
 Firecrawl can monitor the blog on a schedule and notify `/api/firecrawl` when its completed check finds a new, changed, or removed page. The endpoint verifies Firecrawl's raw-body HMAC signature, accepts only the configured monitor, ignores unsuccessful or error-containing checks, and calls the same Vercel deploy hook once for a qualifying event.
 
 Automatic monitoring requires three Vercel Production environment variables listed in `.env.example`: `FIRECRAWL_WEBHOOK_SECRET`, `FIRECRAWL_MONITOR_ID`, and `VERCEL_DEPLOY_HOOK`. No Firecrawl API key belongs in the app or GitHub. See [Firecrawl monitoring setup](docs/firecrawl-monitoring.md) for the safe setup order, whole-blog crawl configuration, detection limitations, and official references.
+
+Creating a Firecrawl monitor requires sufficient credits on the Firecrawl account. If creation returns HTTP 402, fund the correct account and repeat the documented setup without copying API keys into the repository, GitHub, or Vercel. Until `FIRECRAWL_MONITOR_ID` is configured, the webhook intentionally returns 503; this disables automatic monitoring but does not affect the static player, Git-triggered deployments, or manual rebuild workflow.
 
 ### Typeface
 
