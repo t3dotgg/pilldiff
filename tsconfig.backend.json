@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "server",
+    "shared",
+    "scripts",
+    "tests/catalog*.test.ts",
+    "vite.config.ts"
+  ]
+}
