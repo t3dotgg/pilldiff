@@ -1,4 +1,4 @@
-import { ExternalLink, Search, X } from 'lucide-react';
+import { ExternalLink, MessageSquareText, Search, X } from 'lucide-react';
 import type { Playlist } from '../../shared/types';
 
 interface ArchiveProps {
@@ -80,6 +80,7 @@ export function Archive({
           </button>
         </div>
         <div className="archive-tools">
+          <div className="archive-label">The archive</div>
           <label className="search-field">
             <Search size={17} aria-hidden="true" />
             <span className="sr-only">Search playlists and tracks</span>
@@ -130,18 +131,20 @@ export function Archive({
               const showYear = renderedYear !== playlist.year;
               renderedYear = playlist.year;
               const counts = providerCounts(playlist);
+              const notesCount = playlist.tracks.filter((track) => track.description).length;
               return (
                 <div key={playlist.id}>
                   {showYear ? <div className="year-divider">{playlist.year}</div> : null}
                   <div className={`archive-card ${selectedPlaylistId === playlist.id ? 'is-selected' : ''}`}>
-                    <button type="button" onClick={() => onSelect(playlist.id)}>
+                    <button type="button" onClick={() => onSelect(playlist.id)} aria-current={selectedPlaylistId === playlist.id ? 'true' : undefined}>
                       <span className="archive-card-title">{playlist.shortTitle || playlist.title}</span>
                       <span className="archive-card-meta">
                         {playlist.category || 'playlist'} · {playlist.tracks.length} entries
                       </span>
-                      <span className="provider-tally" aria-label={`${counts.youtube} YouTube and ${counts.soundcloud} SoundCloud entries`}>
+                      <span className="provider-tally" aria-label={`${counts.youtube} YouTube and ${counts.soundcloud} SoundCloud entries${notesCount ? `, ${notesCount} with notes` : ''}`}>
                         {counts.youtube > 0 ? <span className="youtube-dot">YT {counts.youtube}</span> : null}
                         {counts.soundcloud > 0 ? <span className="soundcloud-dot">SC {counts.soundcloud}</span> : null}
+                        {notesCount > 0 ? <span className="notes-tally"><MessageSquareText size={10} aria-hidden="true" /> {notesCount} notes</span> : null}
                       </span>
                     </button>
                     <a href={playlist.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${playlist.title} on billdifferen`}>

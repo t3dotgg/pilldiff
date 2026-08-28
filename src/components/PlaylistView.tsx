@@ -1,8 +1,9 @@
 import { ExternalLink, ListMusic, LoaderCircle, Pause, Play } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import type { PlaybackOrder, Playlist, Track } from '../../shared/types';
 import { orderedTracks } from '../playback/queue';
 import type { PlaybackSession } from '../playback/types';
+import { Artwork } from './Artwork';
+import { TrackNotes } from './TrackNotes';
 
 interface PlaylistViewProps {
   playlist: Playlist;
@@ -13,25 +14,6 @@ interface PlaylistViewProps {
   onPlayPlaylist: () => void;
   onPlayTrack: (trackId: string) => void;
   onTogglePlay: () => void;
-}
-
-function Artwork({ playlist }: { playlist: Playlist }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [playlist.artworkUrl]);
-  if (!playlist.artworkUrl || failed) {
-    return (
-      <div className="artwork artwork-fallback" aria-label="Playlist artwork unavailable">
-        <span className="fallback-disc"><span /></span>
-        <strong>{playlist.year}</strong>
-        <small>{playlist.category || 'billdifferen playlist'}</small>
-      </div>
-    );
-  }
-  return (
-    <div className="artwork">
-      <img src={playlist.artworkUrl} alt="" onError={() => setFailed(true)} />
-    </div>
-  );
 }
 
 function dateLabel(value: string): string {
@@ -64,6 +46,7 @@ export function PlaylistView({
 }: PlaylistViewProps) {
   const youtubeCount = playlist.tracks.filter((track) => track.provider === 'youtube').length;
   const soundCloudCount = playlist.tracks.length - youtubeCount;
+  const notesCount = playlist.tracks.filter((track) => track.description).length;
   const isActivePlaylist = session?.playlistId === playlist.id;
   const isActiveListeningSession = isActivePlaylist && session.hasStarted;
   const isPending = isActiveListeningSession && session.status === 'loading' && session.intentPlaying;
@@ -78,11 +61,12 @@ export function PlaylistView({
       <div className="playlist-hero">
         <Artwork playlist={playlist} />
         <div className="playlist-intro">
-          <div className="eyebrow">{playlist.category || 'playlist'} · {playlist.year}</div>
-          <h1 id="playlist-title">{playlist.title}</h1>
+          <div className="eyebrow">{playlist.category || 'playlist'} <span>/</span> {playlist.year}</div>
+          <h1 id="playlist-title" aria-label={playlist.title}>{playlist.shortTitle || playlist.title}</h1>
+          {playlist.shortTitle !== playlist.title ? <p className="playlist-original-title">{playlist.title}</p> : null}
           <div className="playlist-meta">
-            <span>posted {dateLabel(playlist.publishedAt)}</span>
-            <span>{playlist.tracks.length} supported entries</span>
+            <span>{dateLabel(playlist.publishedAt)}</span>
+            <span>{playlist.tracks.length} entries</span>
             <span className="youtube-text">{youtubeCount} YouTube</span>
             <span className="soundcloud-text">{soundCloudCount} SoundCloud</span>
           </div>
@@ -97,7 +81,7 @@ export function PlaylistView({
               aria-label={isPending ? 'Cancel pending playlist' : isActivelyPlaying ? 'Pause selected playlist' : 'Play selected playlist'}
             >
               {isPending ? <LoaderCircle className="spin" size={18} /> : isActivelyPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
-              {isPending ? 'Cancel' : isActivelyPlaying ? 'Pause' : isActiveListeningSession ? 'Resume' : 'Play'}
+              {isPending ? 'Cancel' : isActivelyPlaying ? 'Pause' : isActiveListeningSession ? 'Resume' : 'Play playlist'}
             </button>
             <div className="order-switch" role="group" aria-label="Playback order">
               <button
@@ -122,8 +106,8 @@ export function PlaylistView({
         </div>
       </div>
       <div className="track-heading">
-        <div><ListMusic size={18} /> Tracklist</div>
-        <span>Blog ranking stays visible in either playback order.</span>
+        <div><ListMusic size={17} /> Tracklist <span className="track-count">{playlist.tracks.length}</span></div>
+        <span>{notesCount ? `${notesCount} ${notesCount === 1 ? 'entry' : 'entries'} with Bill’s notes` : 'No song notes in this post'}</span>
       </div>
       <ol className="track-list">
         {visibleTracks.map((track) => {
@@ -160,6 +144,7 @@ export function PlaylistView({
               >
                 <ExternalLink size={14} />
               </a>
+              {track.description ? <TrackNotes track={track} sourceUrl={playlist.sourceUrl} /> : null}
             </li>
           );
         })}

@@ -61,7 +61,7 @@ test('fits desktop and narrow viewports while mobile archive browsing preserves 
   await page.getByRole('button', { name: 'Play playback' }).click();
   const activeInstance = await latestInstance(page, 'youtube');
 
-  for (const viewportWidth of [1440, 390, 320]) {
+  for (const viewportWidth of [1920, 1440, 1250, 1100, 1051, 1050, 901, 900, 768, 600, 390, 320]) {
     await page.setViewportSize({ width: viewportWidth, height: 900 });
     await expect.poll(async () => page.evaluate(() => ({
       documentWidth: document.documentElement.scrollWidth,

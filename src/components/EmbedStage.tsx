@@ -1,11 +1,13 @@
-import { AlertCircle, ExternalLink, LoaderCircle, Play, RotateCcw, SkipForward } from 'lucide-react';
+import { AlertCircle, AudioLines, ExternalLink, LoaderCircle, Play, RotateCcw, SkipForward } from 'lucide-react';
 import type { RefObject } from 'react';
 import type { Track } from '../../shared/types';
 import type { PlaybackSession } from '../playback/types';
+import { TrackNotes } from './TrackNotes';
 
 interface EmbedStageProps {
   session?: PlaybackSession;
   track?: Track;
+  sourceUrl?: string;
   youtubeHostRef: RefObject<HTMLDivElement | null>;
   soundCloudHostRef: RefObject<HTMLDivElement | null>;
   onContinue: () => void;
@@ -16,6 +18,7 @@ interface EmbedStageProps {
 export function EmbedStage({
   session,
   track,
+  sourceUrl,
   youtubeHostRef,
   soundCloudHostRef,
   onContinue,
@@ -26,7 +29,7 @@ export function EmbedStage({
   return (
     <aside className="embed-stage" aria-label="Now playing source">
       <div className="embed-heading">
-        <span>official player</span>
+        <span>Source player</span>
         {session?.status === 'loading' || session?.status === 'buffering' ? (
           <span className="player-state"><LoaderCircle className="spin" size={14} /> {session.status}</span>
         ) : (
@@ -68,8 +71,8 @@ export function EmbedStage({
         />
         {!track ? (
           <div className="embed-empty">
-            <span className="mini-disc" />
-            <p>Choose a playlist to cue its first source.</p>
+            <AudioLines size={32} strokeWidth={1} />
+            <p>Pick a playlist. Press play.</p>
           </div>
         ) : null}
       </div>
@@ -80,6 +83,11 @@ export function EmbedStage({
             <strong>{track.title || track.label}</strong>
             {track.artist ? <span>{track.artist}</span> : null}
           </div>
+        </div>
+      ) : null}
+      {track?.description ? (
+        <div className="now-playing-notes">
+          <TrackNotes key={track.id} track={track} sourceUrl={sourceUrl} initiallyOpen />
         </div>
       ) : null}
     </aside>

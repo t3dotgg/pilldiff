@@ -1,4 +1,4 @@
-import { ExternalLink, Library, Menu, RefreshCw } from 'lucide-react';
+import { AudioLines, ExternalLink, LoaderCircle, Menu, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CatalogResponse, PlaybackOrder, Playlist } from '../shared/types';
 import { Archive } from './components/Archive';
@@ -33,8 +33,7 @@ async function requestCatalog(method: 'GET' | 'POST', signal?: AbortSignal): Pro
 function AppMark() {
   return (
     <span className="app-mark" aria-hidden="true">
-      <span className="app-mark-slot" />
-      <span className="app-mark-hole" />
+      <AudioLines size={25} strokeWidth={1.5} />
     </span>
   );
 }
@@ -80,7 +79,7 @@ function MusicWorkspace({
       const target = event.target;
       if (
         target instanceof HTMLElement &&
-        (target.matches('input, select, textarea, button, a') || target.isContentEditable)
+        (target.closest('input, select, textarea, button, a, summary') || target.isContentEditable)
       ) {
         return;
       }
@@ -119,9 +118,8 @@ function MusicWorkspace({
     <div className="app-shell">
       <header className="topbar">
         <div className="brand-lockup">
-          <AppMark />
-          <span className="brand-name">pilldiff</span>
-          <span className="brand-tagline">the billdifferen playlist player</span>
+          <span className="brand-name">billdifferen</span>
+          <span className="brand-tagline">the unofficial playlist player</span>
         </div>
         <div className="topbar-actions">
           <button
@@ -191,6 +189,7 @@ function MusicWorkspace({
           <EmbedStage
             session={playback.session}
             track={playback.currentTrack}
+            sourceUrl={playback.playingPlaylist?.sourceUrl}
             youtubeHostRef={youtubeHostRef}
             soundCloudHostRef={soundCloudHostRef}
             onContinue={playback.togglePlay}
@@ -279,8 +278,8 @@ export default function App() {
     return (
       <div className="loading-screen" role="status">
         <AppMark />
-        <div className="loading-record"><span /></div>
-        <p>Indexing the billdifferen archive…</p>
+        <LoaderCircle className="spin" size={28} />
+        <p>Opening the billdifferen archive…</p>
       </div>
     );
   }
