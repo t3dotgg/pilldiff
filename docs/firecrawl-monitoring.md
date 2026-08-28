@@ -48,7 +48,8 @@ This JSON is a starting point for the Firecrawl dashboard or `POST /v2/monitor` 
       "scrapeOptions": {
         "formats": ["markdown"],
         "onlyMainContent": true,
-        "includeTags": [".blog-posts"]
+        "includeTags": [".blog-posts"],
+        "excludeTags": ["iframe"]
       }
     }
   ]
@@ -67,6 +68,8 @@ After the Vercel variables are active, add this webhook configuration to that sa
 ```
 
 `sitemap: "only"` uses the sitemap plus the starting URL without spending the page budget on HTML-discovered archive, search, or query variants. `ignoreQueryParameters: true` keeps query-string variants from becoming separate monitored pages. The `.blog-posts` selector includes post titles and bodies while excluding most surrounding blog chrome; `.post-body` is a narrower alternative if the first diff still contains noise. Inspect the first check before relying on either selector. Firecrawl stores the comparison baseline and performs fresh scrapes for monitor checks by default. `judgeEnabled: false` keeps the trigger based on the completed check's summary counts rather than an AI judgment. Do not subscribe to `monitor.page`: it emits once per page and can create a burst of redundant builds. Optional change and error email notifications can be enabled separately in the Firecrawl dashboard.
+
+`excludeTags: ["iframe"]` omits embedded YouTube and SoundCloud player UI from the comparison. Controls, thumbnails, subscriber counts, and widget text can vary between checks even when the blog is unchanged and should not trigger rebuilds. Keep `.blog-posts` included so post titles, direct song links, notes, and post images outside the players remain in the monitored content. This filter affects only monitoring; catalog imports and playback still use the original Blogger content.
 
 The page limit is intentionally bounded because monitoring uses external credits per discovered page and check. Review Firecrawl's estimated usage after the first crawl; pricing and plan limits belong to the Firecrawl account and can change.
 
