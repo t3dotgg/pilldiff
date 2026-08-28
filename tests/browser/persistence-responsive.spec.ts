@@ -78,7 +78,7 @@ test('fits desktop and narrow viewports while mobile archive browsing preserves 
   await expect(archive).toBeVisible();
   await page.getByPlaceholder('Search playlists or tracks').fill('Cloud Sequence');
   await expect(archive.getByText('1 playlist', { exact: true })).toBeVisible();
-  await archive.getByRole('button', { name: /^Collections 2025/ }).click();
+  await archive.getByRole('link', { name: /^Collections 2025/ }).click();
   await expect(page.getByRole('heading', { name: 'Collections 2025 — Long Players' })).toBeVisible();
 
   expect((await latestInstance(page, 'youtube'))?.instanceId).toBe(activeInstance?.instanceId);

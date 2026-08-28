@@ -104,6 +104,6 @@ export async function selectPlaylist(page: Page, title: string): Promise<void> {
     await archiveButton.click();
   }
   await page.getByRole('complementary', { name: 'Playlist archive' })
-    .getByRole('button', { name: new RegExp(`^${title}`) })
+    .getByRole('link', { name: new RegExp(`^${title}`) })
     .click();
 }

@@ -43,7 +43,7 @@ const updateScenarios = [
   {
     name: 'removes its playlist',
     playlists: [collectionPlaylist],
-    browseTitle: collectionPlaylist.title,
+    browseTitle: 'Playlist not found.',
   },
 ];
 
@@ -73,6 +73,7 @@ for (const scenario of updateScenarios) {
     await page.getByRole('button', { name: 'Check for playlist updates' }).click();
     await updateResponse;
     await expect(page.getByRole('heading', { name: scenario.browseTitle, exact: true })).toBeVisible();
+    await expect(page).toHaveURL(/\/playlists\/july-2026$/);
 
     await expectCurrentTrack(page, 'Sunrise Relay');
     await waitForProviderPlaying(page, 'youtube');

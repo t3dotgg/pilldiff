@@ -349,23 +349,24 @@ button:disabled {
   background: var(--accent);
 }
 
-.archive-card > button {
+.archive-card > .archive-playlist-link {
   min-width: 0;
   padding: 12px 3px 12px 11px;
   border: 0;
   text-align: left;
+  text-decoration: none;
   background: none;
   cursor: pointer;
 }
 
-.archive-card > a {
+.archive-card > .archive-source-link {
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--dim);
 }
 
-.archive-card > a:hover {
+.archive-card > .archive-source-link:hover {
   color: var(--accent);
 }
 
@@ -1275,6 +1276,15 @@ input[type="range"] {
 
 .empty-catalog {
   grid-column: 1;
+}
+
+.playlist-not-found {
+  grid-column: 1 / -1;
+  min-height: 320px;
+}
+
+.playlist-not-found .primary-button {
+  text-decoration: none;
 }
 
 .loading-screen .app-mark,

@@ -311,6 +311,7 @@ export async function installMockSdks(page: Page, options: MockSdkOptions = {}):
         this.instance.playing = false;
         this.instance.playerState = 5;
         record(this.instance, 'cuePlaylist', [input]);
+        defer(() => this.events.onStateChange?.({ data: 5, target: this }));
       }
 
       playVideo(): void {

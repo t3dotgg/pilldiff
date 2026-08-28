@@ -1,10 +1,12 @@
 import { AudioLines, ExternalLink, LoaderCircle, Menu, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useRoute } from 'wouter';
 import type { Catalog, PlaybackOrder, Playlist } from '../shared/types';
 import { Archive } from './components/Archive';
 import { EmbedStage } from './components/EmbedStage';
 import { PlaylistView } from './components/PlaylistView';
 import { Transport } from './components/Transport';
+import { playlistPath } from './navigation';
 import { usePlayback } from './playback/usePlayback';
 
 interface CatalogState {
@@ -68,7 +70,13 @@ function MusicWorkspace({
   onCheckForUpdates: () => void;
 }) {
   const playlists = catalog.playlists;
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState(playlists[0]?.id ?? '');
+  const [path, navigate] = useLocation();
+  const [, routeParams] = useRoute('/playlists/:playlistId');
+  const latestPlaylist = playlists[0];
+  const selectedPlaylist = path === '/'
+    ? latestPlaylist
+    : playlists.find((playlist) => playlist.id === routeParams?.playlistId);
+  const playlistNotFound = !selectedPlaylist && path !== '/';
   const [search, setSearch] = useState('');
   const [year, setYear] = useState('');
   const [category, setCategory] = useState('');
@@ -76,16 +84,22 @@ function MusicWorkspace({
   const [browseOrders, setBrowseOrders] = useState<Record<string, PlaybackOrder>>({});
   const youtubeHostRef = useRef<HTMLDivElement>(null);
   const soundCloudHostRef = useRef<HTMLDivElement>(null);
-  const playback = usePlayback(playlists, youtubeHostRef, soundCloudHostRef);
+  const playback = usePlayback(playlists, youtubeHostRef, soundCloudHostRef, selectedPlaylist?.id);
 
   useEffect(() => {
-    if (!playlists.some((playlist) => playlist.id === selectedPlaylistId)) {
-      setSelectedPlaylistId(playlists[0]?.id ?? '');
+    if (path === '/' && latestPlaylist) {
+      navigate(playlistPath(latestPlaylist.id), { replace: true });
     }
-  }, [playlists, selectedPlaylistId]);
+  }, [latestPlaylist, navigate, path]);
 
-  const selectedPlaylist =
-    playlists.find((playlist) => playlist.id === selectedPlaylistId) ?? playlists[0];
+  useEffect(() => {
+    document.title = selectedPlaylist
+      ? `${selectedPlaylist.title} — pilldiff`
+      : playlistNotFound
+        ? 'Playlist not found — pilldiff'
+        : 'pilldiff — the billdifferen playlist player';
+  }, [playlistNotFound, selectedPlaylist]);
+
   const selectedOrder =
     playback.session && playback.session.playlistId === selectedPlaylist?.id
       ? playback.session.order
@@ -182,8 +196,7 @@ function MusicWorkspace({
           onSearch={setSearch}
           onYear={setYear}
           onCategory={setCategory}
-          onSelect={(playlistId) => {
-            setSelectedPlaylistId(playlistId);
+          onSelect={() => {
             setArchiveOpen(false);
             window.scrollTo({ top: 0, behavior: 'instant' });
           }}
@@ -202,6 +215,15 @@ function MusicWorkspace({
               onPlayTrack={(trackId) => playback.startPlaylist(selectedPlaylist, selectedOrder, trackId)}
               onTogglePlay={playback.togglePlay}
             />
+          ) : playlistNotFound ? (
+            <div className="empty-catalog playlist-not-found">
+              <AppMark />
+              <h1>Playlist not found.</h1>
+              <p>This link does not match a playlist in the current archive. It may have been removed.</p>
+              <Link className="primary-button" href={latestPlaylist ? playlistPath(latestPlaylist.id) : '/'}>
+                {latestPlaylist ? 'Browse latest playlist' : 'Back to archive'}
+              </Link>
+            </div>
           ) : (
             <div className="empty-catalog">
               <AppMark />

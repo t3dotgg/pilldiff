@@ -62,6 +62,7 @@ export function usePlayback(
   playlists: Playlist[],
   youtubeHostRef: RefObject<HTMLDivElement | null>,
   soundCloudHostRef: RefObject<HTMLDivElement | null>,
+  preferredPlaylistId?: string,
 ): PlaybackControls {
   const [session, setSession] = useState<PlaybackSession>();
   const [activePlaylist, setActivePlaylist] = useState<Playlist>();
@@ -338,7 +339,9 @@ export function usePlayback(
     if (initializedControllerVersionRef.current === controllerVersion) {
       return;
     }
-    const latestPlaylist = activePlaylistRef.current ?? playlists[0];
+    const latestPlaylist = activePlaylistRef.current
+      ?? playlists.find((playlist) => playlist.id === preferredPlaylistId)
+      ?? playlists[0];
     if (!latestPlaylist) {
       return;
     }
@@ -374,7 +377,7 @@ export function usePlayback(
       autoplay: false,
       progress: normalized.progress,
     });
-  }, [controllerVersion, loadTrack, playlists]);
+  }, [controllerVersion, loadTrack, playlists, preferredPlaylistId]);
 
   useEffect(() => {
     if (session) {

@@ -51,6 +51,12 @@ Set `PLAYWRIGHT_BASE_URL` when the app is not on `http://127.0.0.1:5173`, or set
 
 The catalog stores post metadata, media URLs or IDs, and Bill's per-entry commentary when present. Notes are plain text with paragraph breaks, not executable blog HTML. The importer keeps them within entry boundaries, skips widget attribution and unrelated post introductions, and does not invent notes for link-only lists. Schema version 2 invalidates older catalog snapshots that lack this enrichment. The importer only contacts the fixed `billdifferen.blogspot.com` feed and is not a general-purpose fetch proxy. Catalog import and playback use no API keys, accounts, media downloads, or unofficial streams.
 
+## Playlist links
+
+Each playlist has a shareable `/playlists/<playlist-id>` URL using its stable Blogger string ID. Opening `/` replaces the address with the latest playlist's canonical URL. Refreshing, copying a link, opening it in a new tab, and browser Back/Forward keep the browsed playlist in sync with the address. Missing or removed playlists show a not-found view with a recovery link instead of silently displaying a different playlist.
+
+The URL identifies the playlist being browsed, not the playback queue, order, track, or timestamp. Navigation leaves active playback unchanged. A fresh deep link with no saved session cues that playlist paused; an existing valid saved session restores paused independently of the playlist being viewed.
+
 ## Playback notes
 
 Browsers require an initial user gesture before autoplay with sound. Provider policy can also require another click during a YouTube-to-SoundCloud handoff. Ads, removed uploads, private tracks, region restrictions, and provider-side embed blocks remain under YouTube or SoundCloud control.
@@ -73,6 +79,8 @@ Production target: [pilldiff.t3.gg](https://pilldiff.t3.gg/). The private source
 2. Vercel reads `vercel.json`, runs `npm run build` with Node 24, and publishes `dist`.
 3. Deploy once with no environment variables if automatic monitoring is not ready yet. The static player and build-time catalog need no credentials.
 4. Open the production URL and test a real YouTube-to-SoundCloud and SoundCloud-to-YouTube transition after an initial click.
+
+`vercel.json` rewrites only `/playlists/:path*` to `/index.html` so direct playlist visits and refreshes load the frontend. API routes, `/catalog.json`, assets, fonts, and their existing header policies are unchanged.
 
 Every deployment imports the current Blogger feed. A failed import or validation fails the new build, so Vercel leaves the existing production deployment in place. The committed snapshot is intentionally reserved for local/offline use and is not an automatic production fallback. Keep the `strict-origin-when-cross-origin` Referrer-Policy and avoid an iframe policy that blocks YouTube or SoundCloud.
 

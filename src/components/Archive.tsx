@@ -1,5 +1,7 @@
 import { ExternalLink, MessageSquareText, Search, X } from 'lucide-react';
+import { Link } from 'wouter';
 import type { Playlist } from '../../shared/types';
+import { playlistPath } from '../navigation';
 
 interface ArchiveProps {
   playlists: Playlist[];
@@ -11,7 +13,7 @@ interface ArchiveProps {
   onSearch: (value: string) => void;
   onYear: (value: string) => void;
   onCategory: (value: string) => void;
-  onSelect: (playlistId: string) => void;
+  onSelect: () => void;
   onClose: () => void;
   onClear: () => void;
 }
@@ -136,7 +138,18 @@ export function Archive({
                 <div key={playlist.id}>
                   {showYear ? <div className="year-divider">{playlist.year}</div> : null}
                   <div className={`archive-card ${selectedPlaylistId === playlist.id ? 'is-selected' : ''}`}>
-                    <button type="button" onClick={() => onSelect(playlist.id)} aria-current={selectedPlaylistId === playlist.id ? 'true' : undefined}>
+                    <Link
+                      className="archive-playlist-link"
+                      href={playlistPath(playlist.id)}
+                      data-playlist-id={playlist.id}
+                      aria-current={selectedPlaylistId === playlist.id ? 'page' : undefined}
+                      onClick={(event) => {
+                        if (selectedPlaylistId === playlist.id) {
+                          event.preventDefault();
+                        }
+                        onSelect();
+                      }}
+                    >
                       <span className="archive-card-title">{playlist.shortTitle || playlist.title}</span>
                       <span className="archive-card-meta">
                         {playlist.category || 'playlist'} · {playlist.tracks.length} entries
@@ -146,8 +159,8 @@ export function Archive({
                         {counts.soundcloud > 0 ? <span className="soundcloud-dot">SC {counts.soundcloud}</span> : null}
                         {notesCount > 0 ? <span className="notes-tally"><MessageSquareText size={10} aria-hidden="true" /> {notesCount} notes</span> : null}
                       </span>
-                    </button>
-                    <a href={playlist.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${playlist.title} on billdifferen`}>
+                    </Link>
+                    <a className="archive-source-link" href={playlist.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${playlist.title} on billdifferen`}>
                       <ExternalLink size={15} />
                     </a>
                   </div>
