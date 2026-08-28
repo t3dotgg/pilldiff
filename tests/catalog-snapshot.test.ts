@@ -11,8 +11,11 @@ const rootDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 test('checked seed retains audited live archive coverage', async () => {
   const catalog = JSON.parse(await readFile(resolve(rootDirectory, 'data/catalog.json'), 'utf8')) as Catalog;
   validateCatalog(catalog);
+  assert.equal(catalog.schemaVersion, 2);
   assert.equal(catalog.totalPosts, 40);
   assert.equal(catalog.playlists.length, 39);
+  assert.equal(catalog.playlists.reduce((total, playlist) => total + playlist.tracks.length, 0), 2189);
+  assert.ok(catalog.playlists.flatMap((playlist) => playlist.tracks).filter((track) => track.description).length > 1200);
 
   const byTitle = new Map(catalog.playlists.map((playlist) => [playlist.title, playlist]));
   const july = byTitle.get("billdifferen's favorite music of july 2026");
@@ -29,6 +32,7 @@ test('checked seed retains audited live archive coverage', async () => {
   const releases2021 = byTitle.get("billdifferen's top 100 releases of 2021");
 
   assert.equal(july?.tracks.length, 50);
+  assert.ok(july?.tracks.every((track) => track.description === undefined));
   assert.equal(june?.tracks.length, 50);
   assert.equal(may?.tracks.length, 48);
   assert.equal(may?.skipped.bandcamp, 2);
@@ -42,6 +46,10 @@ test('checked seed retains audited live archive coverage', async () => {
   assert.equal(baileFunk?.tracks.length, 94);
   assert.equal(releases2021?.tracks.length, 52);
   assert.equal(releases2021?.skipped.bandcamp, 54);
+  assert.equal(releases2021?.tracks[0].description, undefined);
+  assert.match(releases2021?.tracks.find((track) => track.rank === 97)?.description ?? '', /^\(.+\)$/);
+  const releases2022 = byTitle.get("billdifferen's top 100 releases of 2022");
+  assert.match(releases2022?.tracks.find((track) => track.rank === 99)?.description ?? '', /^\[.+\]\n\nMust Listen:/);
   assert.deepEqual(jerseyGuide?.tracks.map((track) => track.rank), Array.from({ length: 40 }, (unusedValue, index) => 40 - index));
   assert.deepEqual(
     baileFunk?.tracks.map((track) => track.rank),

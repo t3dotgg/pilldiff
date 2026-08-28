@@ -16,6 +16,7 @@ export interface Track {
   position: number;
   kind: 'track' | 'playlist';
   startSeconds?: number;
+  description?: string;
 }
 
 export interface Playlist {
@@ -33,7 +34,7 @@ export interface Playlist {
 }
 
 export interface Catalog {
-  schemaVersion: 1;
+  schemaVersion: 2;
   source: { title: string; url: string };
   fetchedAt: string;
   totalPosts: number;

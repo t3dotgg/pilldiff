@@ -100,7 +100,7 @@ export const collectionPlaylist: Playlist = {
 };
 
 export const browserCatalog: Catalog = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   source: {
     title: 'Difference',
     url: 'https://billdifferen.blogspot.com/',

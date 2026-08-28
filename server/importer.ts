@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio';
 import type { Cheerio, CheerioAPI } from 'cheerio';
 import type { AnyNode } from 'domhandler';
 import type { Catalog, Playlist, Provider, Track } from '../shared/types.js';
+import { attachTrackDescriptions, type TrackSelection } from './commentary.js';
 
 export const BLOG_URL = 'https://billdifferen.blogspot.com/';
 export const FEED_URL = 'https://billdifferen.blogspot.com/feeds/posts/default';
@@ -63,6 +64,7 @@ interface ParsedMedia {
 }
 
 interface MediaEvent {
+  nodes: AnyNode[];
   type: 'anchor' | 'iframe';
   order: number;
   blockOrder: number;
@@ -391,7 +393,7 @@ function postIdentity(entry: BloggerEntry): string {
   return rawId.match(/post-(\d+)$/)?.[1] ?? stableId(rawId);
 }
 
-function extractMediaEvents(document: CheerioAPI): { events: MediaEvent[]; bandcamp: number; other: number } {
+function extractMediaEvents(document: CheerioAPI): { events: MediaEvent[]; bandcamp: number; other: number; skippedSources: AnyNode[] } {
   const elementOrder = new WeakMap<object, number>();
   document('*').each((order, element) => {
     elementOrder.set(element as object, order);
@@ -404,6 +406,7 @@ function extractMediaEvents(document: CheerioAPI): { events: MediaEvent[]; bandc
 
   const events: MediaEvent[] = [];
   const bandcampEvents: Array<{ type: 'anchor' | 'iframe'; order: number }> = [];
+  const skippedSources: AnyNode[] = [];
   let other = 0;
 
   document('a[href],iframe[src]').each((unusedIndex, element) => {
@@ -414,7 +417,10 @@ function extractMediaEvents(document: CheerioAPI): { events: MediaEvent[]; bandc
     if (isBandcamp(rawUrl)) {
       const block = closestShortBlock(document, element);
       const rank = extractRank(normalizeText(block.text()));
-      if (type === 'iframe' || isCuratedAnchor(block, node, rank)) bandcampEvents.push({ type, order });
+      if (type === 'iframe' || isCuratedAnchor(block, node, rank)) {
+        bandcampEvents.push({ type, order });
+        skippedSources.push(element);
+      }
       return;
     }
     const media = parseSupportedMedia(rawUrl);
@@ -435,6 +441,7 @@ function extractMediaEvents(document: CheerioAPI): { events: MediaEvent[]; bandc
       ? inferLabel(node.text(), blockText, contexts)
       : stripRank(contextualLabel || attribution?.label || '');
     events.push({
+      nodes: [element],
       type,
       order,
       blockOrder: elementOrder.get(block.get(0) as object) ?? order,
@@ -453,10 +460,10 @@ function extractMediaEvents(document: CheerioAPI): { events: MediaEvent[]; bandc
     bandcamp += 1;
     if (current.type === 'anchor' && next?.type === 'iframe' && next.order - current.order <= 10) index += 1;
   }
-  return { events, bandcamp, other };
+  return { events, bandcamp, other, skippedSources };
 }
 
-function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank: boolean): Track[] {
+function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank: boolean): TrackSelection[] {
   const normalizedEvents: MediaEvent[] = [];
   for (let index = 0; index < events.length; index += 1) {
     let event = events[index];
@@ -482,24 +489,24 @@ function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank
         : secondLabel.includes(firstLabel)
           ? secondLabel
           : normalizeText(`${firstLabel} ${secondLabel}`);
-      event = { ...event, label: combinedLabel, rank: event.rank ?? duplicateAnchor.rank };
+      event = { ...event, nodes: [...event.nodes, ...duplicateAnchor.nodes], label: combinedLabel, rank: event.rank ?? duplicateAnchor.rank };
       index += 1;
     }
     normalizedEvents.push(event);
   }
 
-  const tracks: Track[] = [];
+  const selections: TrackSelection[] = [];
   const representedRanks = new Set<number>();
   const rankedAnchors = normalizedEvents.filter((event) => event.type === 'anchor' && event.rank !== undefined);
   const firstRankedOrder = rankedAnchors[0]?.order;
   const lastRankedOrder = rankedAnchors.at(-1)?.order;
 
-  const appendTrack = (mediaEvent: MediaEvent, label: string, rank: number | undefined, sourceUrl: string): void => {
+  const appendTrack = (mediaEvent: MediaEvent, label: string, rank: number | undefined, sourceUrl: string, sources = mediaEvent.nodes): void => {
     if (singleTrackPerRank && rank !== undefined && representedRanks.has(rank)) return;
     const cleanLabel = stripRank(label || mediaEvent.attribution?.label || `${mediaEvent.media.provider === 'youtube' ? 'YouTube' : 'SoundCloud'} ${mediaEvent.media.kind}`);
     const { artist, title } = splitLabel(cleanLabel);
-    const position = tracks.length + 1;
-    tracks.push({
+    const position = selections.length + 1;
+    const track: Track = {
       id: stableId(postId, position, mediaEvent.media.provider, mediaEvent.media.fingerprint),
       provider: mediaEvent.media.provider,
       title,
@@ -513,7 +520,8 @@ function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank
       position,
       kind: mediaEvent.media.kind,
       startSeconds: mediaEvent.media.startSeconds,
-    });
+    };
+    selections.push({ track, sources });
     if (rank !== undefined) representedRanks.add(rank);
   };
 
@@ -555,14 +563,15 @@ function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank
       const sourceUrl = iframeEvent.media.provider === event.media.provider
         ? event.media.sourceUrl
         : iframeEvent.attribution?.sourceUrl ?? iframeEvent.media.sourceUrl;
-      appendTrack(iframeEvent, label, event.rank ?? iframeEvent.rank, sourceUrl);
+      const sources = normalizedEvents.slice(index, pairedIframeIndex + 1).flatMap((candidate) => candidate.nodes);
+      appendTrack(iframeEvent, label, event.rank ?? iframeEvent.rank, sourceUrl, sources);
       index = pairedIframeIndex;
       continue;
     }
 
     if (event.rank !== undefined) appendTrack(event, event.label, event.rank, event.media.sourceUrl);
   }
-  return tracks;
+  return selections;
 }
 
 function deriveShortTitle(title: string): string {
@@ -612,7 +621,9 @@ export function parsePost(entry: BloggerEntry): Playlist | undefined {
   const extracted = extractMediaEvents(document);
   const title = normalizeText(entry.title.$t);
   const singleTrackPerRank = /(?:top|favorite)\s+\d+\s+releases/i.test(title);
-  const tracks = eventsToTracks(extracted.events, postId, singleTrackPerRank);
+  const selections = eventsToTracks(extracted.events, postId, singleTrackPerRank);
+  attachTrackDescriptions(document, selections, extracted.skippedSources);
+  const tracks = selections.map((selection) => selection.track);
   if (tracks.length === 0) return undefined;
   const sourceUrl = entry.link?.find((link) => link.rel === 'alternate')?.href ?? BLOG_URL;
   return {
@@ -631,7 +642,7 @@ export function parsePost(entry: BloggerEntry): Playlist | undefined {
 }
 
 export function validateCatalog(catalog: Catalog): void {
-  if (catalog.schemaVersion !== 1) throw new Error('Unsupported catalog schema');
+  if (catalog.schemaVersion !== 2) throw new Error('Unsupported catalog schema');
   if (!Number.isInteger(catalog.totalPosts) || catalog.totalPosts < 1) throw new Error('Catalog has no source posts');
   if (catalog.playlists.length > catalog.totalPosts) throw new Error('Catalog has more playlists than posts');
   const playlistIds = new Set<string>();
@@ -641,6 +652,9 @@ export function validateCatalog(catalog: Catalog): void {
     if (playlist.tracks.length === 0) throw new Error(`Playlist has no tracks: ${playlist.title}`);
     playlist.tracks.forEach((track, index) => {
       if (track.position !== index + 1) throw new Error(`Invalid track positions in: ${playlist.title}`);
+      if (track.description !== undefined && (typeof track.description !== 'string' || !track.description.trim())) {
+        throw new Error(`Invalid track description in: ${playlist.title}`);
+      }
     });
   }
 }
@@ -690,7 +704,7 @@ export async function importCatalog(options: ImportOptions = {}): Promise<Catalo
     return playlist ? [playlist] : [];
   });
   const catalog: Catalog = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     source: { title: SOURCE_TITLE, url: BLOG_URL },
     fetchedAt: (options.now ?? new Date()).toISOString(),
     totalPosts: expectedTotal,

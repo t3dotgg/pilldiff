@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
@@ -8,7 +8,7 @@ import { CatalogStore, writeCatalogAtomically } from '../server/catalog-store.js
 
 function catalog(fetchedAt: string, title: string): Catalog {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     source: { title: 'billdifferen', url: 'https://billdifferen.blogspot.com/' },
     fetchedAt,
     totalPosts: 1,
@@ -108,4 +108,20 @@ test('surfaces refresh failure when no disk snapshot is valid', async (context) 
     },
   });
   await assert.rejects(() => store.refresh(), /no valid catalog.*upstream unavailable/i);
+});
+
+test('ignores a newer legacy cache in favor of the seed with song descriptions', async (context) => {
+  const directory = await mkdtemp(resolve(tmpdir(), 'pilldiff-store-'));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const seedPath = resolve(directory, 'seed.json');
+  const cachePath = resolve(directory, 'cache.json');
+  const seed = catalog('2024-01-01T00:00:00.000Z', 'Enriched seed');
+  seed.playlists[0].tracks[0].description = 'A note about this particular song.';
+  await writeCatalogAtomically(seedPath, seed);
+  const legacy = { ...catalog('2024-02-01T00:00:00.000Z', 'Legacy cache'), schemaVersion: 1 };
+  await writeFile(cachePath, JSON.stringify(legacy));
+  const store = new CatalogStore({ seedPath, cachePath });
+  const response = await store.get();
+  assert.equal(response.catalog.schemaVersion, 2);
+  assert.equal(response.catalog.playlists[0].tracks[0].description, seed.playlists[0].tracks[0].description);
 });

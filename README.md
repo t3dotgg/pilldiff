@@ -44,7 +44,7 @@ Set `PLAYWRIGHT_BASE_URL` when the app is not on `http://127.0.0.1:5173`, or set
 - `npm run sync` deliberately replaces the checked-in seed atomically. Normal app refreshes never modify tracked data.
 - `shared/types.ts` is the contract used by the React client and Node server.
 
-The catalog stores post metadata and media URLs or IDs only, not article bodies. The importer only contacts the fixed `billdifferen.blogspot.com` feed and is not a general-purpose fetch proxy. No API keys, accounts, media downloads, or unofficial streams are used.
+The catalog stores post metadata, media URLs or IDs, and Bill's per-entry commentary when present. Notes are plain text with paragraph breaks, not executable blog HTML. The importer keeps them within entry boundaries, skips widget attribution and unrelated post introductions, and does not invent notes for link-only lists. Schema version 2 invalidates older caches that lack this enrichment. The importer only contacts the fixed `billdifferen.blogspot.com` feed and is not a general-purpose fetch proxy. No API keys, accounts, media downloads, or unofficial streams are used.
 
 ## Playback notes
 
