@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidebar study 02: Year index · billdifferen</title>
+    <link rel="stylesheet" href="./shared.css">
+    <script defer src="./data.js"></script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body data-layout="year-index">
+    <header class="study-bar">
+      <div class="brand-lockup">
+        <a class="brand" href="./01-reading-list.html">billdifferen</a>
+        <span class="brand-note">the unofficial playlist player</span>
+      </div>
+      <nav class="study-nav" aria-label="Sidebar layout studies">
+        <a href="./01-reading-list.html">01 Reading list</a>
+        <a href="./02-year-index.html" aria-current="page">02 Year index</a>
+        <a href="./03-series-library.html">03 Series library</a>
+      </nav>
+      <span class="study-status">Layout study</span>
+    </header>
+
+    <div class="demo-shell">
+      <aside class="sidebar" aria-labelledby="sidebar-title">
+        <div class="sidebar-intro">
+          <p class="eyebrow">Option 02 / Era first</p>
+          <h1 id="sidebar-title">Year index</h1>
+          <p>Open one era at a time, then scan complete titles without paging through every monthly post.</p>
+          <div class="filter-stack">
+            <label class="field">
+              <span>Search across all years</span>
+              <input class="text-input" id="year-search" type="search" placeholder="Search playlist titles" autocomplete="off">
+            </label>
+          </div>
+          <p class="result-summary" id="year-summary" aria-live="polite"></p>
+        </div>
+        <div class="sidebar-scroll year-index" id="year-results" aria-label="Playlists grouped by year"></div>
+      </aside>
+
+      <main class="preview-pane">
+        <div class="preview-inner">
+          <div class="artwork-frame">
+            <span class="artwork-placeholder" id="preview-artwork-placeholder">Loading original post artwork</span>
+            <img id="preview-artwork" alt="" hidden>
+          </div>
+          <header class="preview-header">
+            <div class="preview-copy">
+              <p class="eyebrow" id="preview-eyebrow"></p>
+              <h2 id="preview-title"></h2>
+              <div class="preview-details" id="preview-details"></div>
+            </div>
+            <a class="source-link" id="preview-source-link" href="#" target="_blank" rel="noreferrer">
+              Original post <span aria-hidden="true">↗</span>
+            </a>
+          </header>
+          <section class="track-section" aria-labelledby="track-heading">
+            <div class="track-heading">
+              <h3 id="track-heading">Tracklist sample</h3>
+              <span id="preview-track-summary"></span>
+            </div>
+            <ol class="track-sample" id="preview-track-sample"></ol>
+          </section>
+          <p class="mock-notice">Audio is intentionally disconnected in this layout study.</p>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
