@@ -2,7 +2,6 @@ import { expect, test } from '@playwright/test';
 import type { Playlist } from '../../shared/types';
 import {
   browserCatalog,
-  catalogResponse,
   collectionPlaylist,
   summerPlaylist,
 } from './catalog-fixture';
@@ -35,7 +34,7 @@ const replacementPlaylist: Playlist = {
   ],
 };
 
-const refreshScenarios = [
+const updateScenarios = [
   {
     name: 'replaces its current track',
     playlists: [replacementPlaylist, collectionPlaylist],
@@ -48,16 +47,14 @@ const refreshScenarios = [
   },
 ];
 
-for (const scenario of refreshScenarios) {
-  test(`keeps the captured active queue when refresh ${scenario.name}`, async ({ page }) => {
+for (const scenario of updateScenarios) {
+  test(`keeps the captured active queue when an update check ${scenario.name}`, async ({ page }) => {
     await installAppHarness(page, {
-      refreshResponse: catalogResponse({
-        catalog: {
-          ...browserCatalog,
-          fetchedAt: '2026-08-28T08:00:00.000Z',
-          playlists: scenario.playlists,
-        },
-      }),
+      updatedCatalog: {
+        ...browserCatalog,
+        fetchedAt: '2026-08-28T08:00:00.000Z',
+        playlists: scenario.playlists,
+      },
     });
     await openCatalog(page);
     await page.getByRole('button', { name: 'Play playback', exact: true }).click();
@@ -68,11 +65,13 @@ for (const scenario of refreshScenarios) {
     const originalInstance = await latestInstance(page, 'youtube');
     await clearSdkCalls(page);
 
-    const refreshResponse = page.waitForResponse((response) => (
-      response.request().method() === 'POST' && response.url().endsWith('/api/catalog/refresh')
+    const updateResponse = page.waitForResponse((response) => (
+      response.request().method() === 'GET'
+      && new URL(response.url()).pathname === '/catalog.json'
+      && new URL(response.url()).searchParams.has('check')
     ));
-    await page.getByRole('button', { name: 'Refresh playlist archive' }).click();
-    await refreshResponse;
+    await page.getByRole('button', { name: 'Check for playlist updates' }).click();
+    await updateResponse;
     await expect(page.getByRole('heading', { name: scenario.browseTitle, exact: true })).toBeVisible();
 
     await expectCurrentTrack(page, 'Sunrise Relay');

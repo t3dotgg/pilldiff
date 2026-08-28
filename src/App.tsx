@@ -1,6 +1,6 @@
 import { AudioLines, ExternalLink, LoaderCircle, Menu, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { CatalogResponse, PlaybackOrder, Playlist } from '../shared/types';
+import type { Catalog, PlaybackOrder, Playlist } from '../shared/types';
 import { Archive } from './components/Archive';
 import { EmbedStage } from './components/EmbedStage';
 import { PlaylistView } from './components/PlaylistView';
@@ -8,26 +8,44 @@ import { Transport } from './components/Transport';
 import { usePlayback } from './playback/usePlayback';
 
 interface CatalogState {
-  response?: CatalogResponse;
+  catalog?: Catalog;
   loading: boolean;
-  refreshing: boolean;
+  checking: boolean;
   error?: string;
+  warning?: string;
 }
 
-async function requestCatalog(method: 'GET' | 'POST', signal?: AbortSignal): Promise<CatalogResponse> {
-  const response = await fetch(method === 'GET' ? '/api/catalog' : '/api/catalog/refresh', {
-    method,
+async function requestCatalog(checkForUpdates = false, signal?: AbortSignal): Promise<Catalog> {
+  const url = checkForUpdates ? `/catalog.json?check=${Date.now()}` : '/catalog.json';
+  const response = await fetch(url, {
+    method: 'GET',
     signal,
-    headers: { Accept: 'application/json' },
+    cache: checkForUpdates ? 'no-store' : 'default',
+    headers: {
+      Accept: 'application/json',
+      ...(checkForUpdates ? { 'Cache-Control': 'no-cache' } : {}),
+    },
   });
   if (!response.ok) {
     throw new Error(`The archive returned ${response.status}.`);
   }
-  const value = (await response.json()) as CatalogResponse;
-  if (!value?.catalog || !Array.isArray(value.catalog.playlists)) {
+  const catalog = (await response.json()) as Catalog;
+  if (catalog?.schemaVersion !== 2 || !Array.isArray(catalog.playlists)) {
     throw new Error('The archive returned an unexpected response.');
   }
-  return value;
+  return catalog;
+}
+
+function formatSnapshotDate(value: string): string {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return 'date unknown';
+  }
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
 }
 
 function AppMark() {
@@ -39,15 +57,17 @@ function AppMark() {
 }
 
 function MusicWorkspace({
-  response,
-  refreshing,
-  onRefresh,
+  catalog,
+  warning,
+  checking,
+  onCheckForUpdates,
 }: {
-  response: CatalogResponse;
-  refreshing: boolean;
-  onRefresh: () => void;
+  catalog: Catalog;
+  warning?: string;
+  checking: boolean;
+  onCheckForUpdates: () => void;
 }) {
-  const playlists = response.catalog.playlists;
+  const playlists = catalog.playlists;
   const [selectedPlaylistId, setSelectedPlaylistId] = useState(playlists[0]?.id ?? '');
   const [search, setSearch] = useState('');
   const [year, setYear] = useState('');
@@ -131,18 +151,24 @@ function MusicWorkspace({
           >
             <Menu size={18} /> Archive
           </button>
-          <a href={response.catalog.source.url} target="_blank" rel="noreferrer">
+          <span className="snapshot-date">snapshot {formatSnapshotDate(catalog.fetchedAt)}</span>
+          <a href={catalog.source.url} target="_blank" rel="noreferrer">
             original blog <ExternalLink size={14} />
           </a>
-          <button type="button" onClick={onRefresh} disabled={refreshing} aria-label="Refresh playlist archive">
-            <RefreshCw size={15} className={refreshing ? 'spin' : ''} />
-            <span>{refreshing ? 'Refreshing' : 'Refresh'}</span>
+          <button
+            type="button"
+            onClick={onCheckForUpdates}
+            disabled={checking}
+            aria-label="Check for playlist updates"
+          >
+            <RefreshCw size={15} className={checking ? 'spin' : ''} />
+            <span>{checking ? 'Checking' : 'Check for updates'}</span>
           </button>
         </div>
       </header>
-      {response.stale || response.warning ? (
+      {warning ? (
         <div className="catalog-warning" role="status">
-          Showing the saved archive. {response.warning || 'A fresh blog check is not available right now.'}
+          {warning}
         </div>
       ) : null}
       <div className="workspace">
@@ -181,8 +207,8 @@ function MusicWorkspace({
               <AppMark />
               <h1>The archive is quiet.</h1>
               <p>No posts with supported YouTube or SoundCloud sources were found.</p>
-              <button className="primary-button" type="button" onClick={onRefresh} disabled={refreshing}>
-                <RefreshCw size={17} className={refreshing ? 'spin' : ''} /> Refresh archive
+              <button className="primary-button" type="button" onClick={onCheckForUpdates} disabled={checking}>
+                <RefreshCw size={17} className={checking ? 'spin' : ''} /> Check for updates
               </button>
             </div>
           )}
@@ -219,21 +245,21 @@ function MusicWorkspace({
 export default function App() {
   const [catalogState, setCatalogState] = useState<CatalogState>({
     loading: true,
-    refreshing: false,
+    checking: false,
   });
 
   const loadInitial = useMemo(
     () => (signal?: AbortSignal) => {
       setCatalogState((current) => ({ ...current, loading: true, error: undefined }));
-      void requestCatalog('GET', signal)
-        .then((response) => setCatalogState({ response, loading: false, refreshing: false }))
+      void requestCatalog(false, signal)
+        .then((catalog) => setCatalogState({ catalog, loading: false, checking: false }))
         .catch((error) => {
           if (error instanceof DOMException && error.name === 'AbortError') {
             return;
           }
           setCatalogState({
             loading: false,
-            refreshing: false,
+            checking: false,
             error: error instanceof Error ? error.message : 'The playlist archive could not be loaded.',
           });
         });
@@ -247,29 +273,25 @@ export default function App() {
     return () => controller.abort();
   }, [loadInitial]);
 
-  const refresh = () => {
-    if (catalogState.refreshing) {
+  const checkForUpdates = () => {
+    if (catalogState.checking) {
       return;
     }
-    setCatalogState((current) => ({ ...current, refreshing: true }));
-    void requestCatalog('POST')
-      .then((response) => setCatalogState({ response, loading: false, refreshing: false }))
+    setCatalogState((current) => ({ ...current, checking: true, warning: undefined }));
+    void requestCatalog(true)
+      .then((catalog) => setCatalogState({ catalog, loading: false, checking: false }))
       .catch((error) => {
         setCatalogState((current) => ({
           ...current,
-          refreshing: false,
-          response: current.response
-            ? {
-                ...current.response,
-                stale: true,
-                warning: error instanceof Error ? error.message : 'The blog refresh failed.',
-              }
-            : current.response,
-          error: current.response
+          checking: false,
+          warning: current.catalog
+            ? `Couldn’t check the deployed snapshot. ${error instanceof Error ? error.message : 'The check failed.'} The current archive is still available.`
+            : undefined,
+          error: current.catalog
             ? undefined
             : error instanceof Error
               ? error.message
-              : 'The playlist archive could not be refreshed.',
+              : 'The playlist archive could not be checked.',
         }));
       });
   };
@@ -284,7 +306,7 @@ export default function App() {
     );
   }
 
-  if (!catalogState.response || catalogState.error) {
+  if (!catalogState.catalog || catalogState.error) {
     return (
       <div className="error-screen" role="alert">
         <AppMark />
@@ -303,9 +325,10 @@ export default function App() {
 
   return (
     <MusicWorkspace
-      response={catalogState.response}
-      refreshing={catalogState.refreshing}
-      onRefresh={refresh}
+      catalog={catalogState.catalog}
+      warning={catalogState.warning}
+      checking={catalogState.checking}
+      onCheckForUpdates={checkForUpdates}
     />
   );
 }

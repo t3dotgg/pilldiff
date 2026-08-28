@@ -153,6 +153,12 @@ button:disabled {
   gap: 12px;
 }
 
+.snapshot-date {
+  color: var(--dim);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
 .topbar-actions a,
 .topbar-actions button {
   min-height: 36px;
@@ -1423,6 +1429,7 @@ input[type="range"] {
   }
 
   .brand-tagline,
+  .snapshot-date,
   .topbar-actions > a {
     display: none;
   }

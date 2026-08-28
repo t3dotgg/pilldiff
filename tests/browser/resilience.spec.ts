@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { browserCatalog, catalogResponse } from './catalog-fixture';
+import { browserCatalog } from './catalog-fixture';
 import { installAppHarness } from './harness';
 import {
   clearSdkCalls,
@@ -97,33 +97,33 @@ test('keeps a pause made while the next SDK is still becoming ready', async ({ p
   expect((await latestInstance(page, 'soundcloud'))?.playing).toBe(false);
 });
 
-test('refreshes the catalog without reloading or pausing active playback', async ({ page }) => {
+test('checks the catalog without reloading or pausing active playback', async ({ page }) => {
   await installAppHarness(page, {
-    refreshResponse: catalogResponse({
-      catalog: {
-        ...browserCatalog,
-        fetchedAt: '2026-08-28T07:00:00.000Z',
-      },
-    }),
+    updatedCatalog: {
+      ...browserCatalog,
+      fetchedAt: '2026-08-28T07:00:00.000Z',
+    },
   });
   await openCatalog(page);
   await page.getByRole('button', { name: 'Play playback' }).click();
   await setProviderProgress(page, 'youtube', 41, 240);
   await expect(page.getByLabel('Playback controls').getByText('0:41', { exact: true })).toBeVisible();
-  const instanceBeforeRefresh = await latestInstance(page, 'youtube');
+  const instanceBeforeCheck = await latestInstance(page, 'youtube');
   await clearSdkCalls(page);
 
-  const refreshResponse = page.waitForResponse(
-    (response) => response.request().method() === 'POST' && response.url().includes('/api/catalog/refresh'),
+  const updateResponse = page.waitForResponse(
+    (response) => response.request().method() === 'GET'
+      && new URL(response.url()).pathname === '/catalog.json'
+      && new URL(response.url()).searchParams.has('check'),
   );
-  await page.getByRole('button', { name: 'Refresh playlist archive' }).click();
-  await refreshResponse;
-  await expect(page.getByRole('button', { name: 'Refresh playlist archive' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Check for playlist updates' }).click();
+  await updateResponse;
+  await expect(page.getByRole('button', { name: 'Check for playlist updates' })).toBeEnabled();
 
   await expectCurrentTrack(page, 'Sunrise Relay');
   await expect(page.getByRole('button', { name: 'Pause playback' })).toBeVisible();
   await expect(page.getByLabel('Playback controls').getByText('0:41', { exact: true })).toBeVisible();
-  expect((await latestInstance(page, 'youtube'))?.instanceId).toBe(instanceBeforeRefresh?.instanceId);
+  expect((await latestInstance(page, 'youtube'))?.instanceId).toBe(instanceBeforeCheck?.instanceId);
   expect((await latestInstance(page, 'youtube'))?.playing).toBe(true);
   expect(await providerCalls(page, 'youtube', [
     'cueVideoById',
@@ -131,4 +131,52 @@ test('refreshes the catalog without reloading or pausing active playback', async
     'destroy',
     'pauseVideo',
   ])).toHaveLength(0);
+});
+
+test('uses only static GET requests while checking for updates', async ({ page }) => {
+  const catalogRequests: Array<{ method: string; url: string }> = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/catalog') || request.url().includes('/api/')) {
+      catalogRequests.push({ method: request.method(), url: request.url() });
+    }
+  });
+  await installAppHarness(page);
+  await openCatalog(page);
+
+  const updateResponse = page.waitForResponse((response) => (
+    new URL(response.url()).searchParams.has('check')
+  ));
+  await page.getByRole('button', { name: 'Check for playlist updates' }).click();
+  await updateResponse;
+
+  expect(catalogRequests.length).toBeGreaterThan(0);
+  expect(catalogRequests.every((request) => (
+    request.method === 'GET' && new URL(request.url).pathname === '/catalog.json'
+  ))).toBe(true);
+});
+
+test('keeps the current archive and playback when an update check fails', async ({ page }) => {
+  await installAppHarness(page, { updateStatus: 503 });
+  await openCatalog(page);
+  await page.getByRole('button', { name: 'Play playback' }).click();
+  await waitForProviderPlaying(page, 'youtube');
+  const activeInstance = await latestInstance(page, 'youtube');
+
+  await page.getByRole('button', { name: 'Check for playlist updates' }).click();
+
+  await expect(page.locator('.catalog-warning')).toContainText('Couldn’t check the deployed snapshot.');
+  await expect(page.getByRole('heading', { name: browserCatalog.playlists[0].title })).toBeVisible();
+  await expectCurrentTrack(page, 'Sunrise Relay');
+  expect((await latestInstance(page, 'youtube'))?.instanceId).toBe(activeInstance?.instanceId);
+  expect((await latestInstance(page, 'youtube'))?.playing).toBe(true);
+});
+
+test('disables duplicate checks while a catalog request is in flight', async ({ page }) => {
+  await installAppHarness(page, { updateDelay: 200 });
+  await openCatalog(page);
+  const checkButton = page.getByRole('button', { name: 'Check for playlist updates' });
+
+  await checkButton.click();
+  await expect(page.getByRole('button', { name: 'Check for playlist updates' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Check for playlist updates' })).toBeEnabled();
 });

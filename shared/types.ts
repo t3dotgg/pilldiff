@@ -40,9 +40,3 @@ export interface Catalog {
   totalPosts: number;
   playlists: Playlist[];
 }
-
-export interface CatalogResponse {
-  catalog: Catalog;
-  stale: boolean;
-  warning?: string;
-}

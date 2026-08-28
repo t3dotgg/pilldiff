@@ -1,16 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { CatalogResponse } from '../../shared/types';
-import { catalogResponse } from './catalog-fixture';
+import type { Catalog } from '../../shared/types';
+import { browserCatalog } from './catalog-fixture';
 import { installAppHarness } from './harness';
 import { clearSdkCalls, latestInstance, openCatalog, providerCalls, selectPlaylist, waitForProviderPlaying } from './test-helpers';
 
 const artworkBody = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="240"><rect width="640" height="240" fill="#a3332d"/></svg>';
 const secondArtwork = 'https://example.test/art/collections.jpg';
 
-function responseWithArtwork(): CatalogResponse {
-  const response = structuredClone(catalogResponse());
-  response.catalog.playlists[1].artworkUrl = secondArtwork;
-  return response;
+function catalogWithArtwork(): Catalog {
+  const catalog = structuredClone(browserCatalog);
+  catalog.playlists[1].artworkUrl = secondArtwork;
+  return catalog;
 }
 
 async function deferArtwork(page: Page, deferredUrl: string, fail = false) {
@@ -32,7 +32,7 @@ async function deferArtwork(page: Page, deferredUrl: string, fail = false) {
 }
 
 test('replaces the old artwork immediately while the selected image loads', async ({ page }) => {
-  await installAppHarness(page, { response: responseWithArtwork() });
+  await installAppHarness(page, { catalog: catalogWithArtwork() });
   const pending = await deferArtwork(page, secondArtwork);
   await openCatalog(page);
   await expect(page.locator('.artwork')).toHaveAttribute('data-state', 'ready');
@@ -57,7 +57,7 @@ test('replaces the old artwork immediately while the selected image loads', asyn
 });
 
 test('ignores a late failure from a previously selected image', async ({ page }) => {
-  await installAppHarness(page, { response: responseWithArtwork() });
+  await installAppHarness(page, { catalog: catalogWithArtwork() });
   const pending = await deferArtwork(page, secondArtwork, true);
   await openCatalog(page);
   await expect(page.locator('.artwork')).toHaveAttribute('data-state', 'ready');
@@ -72,10 +72,10 @@ test('ignores a late failure from a previously selected image', async ({ page })
 });
 
 test('shows the newly selected identity when artwork is missing or broken', async ({ page }) => {
-  const response = responseWithArtwork();
-  const missingPlaylist = { ...response.catalog.playlists[1], id: 'missing-art', title: 'Missing art', shortTitle: 'Missing art', artworkUrl: undefined };
-  response.catalog.playlists.push(missingPlaylist);
-  await installAppHarness(page, { response });
+  const catalog = catalogWithArtwork();
+  const missingPlaylist = { ...catalog.playlists[1], id: 'missing-art', title: 'Missing art', shortTitle: 'Missing art', artworkUrl: undefined };
+  catalog.playlists.push(missingPlaylist);
+  await installAppHarness(page, { catalog });
   const pending = await deferArtwork(page, secondArtwork, true);
   await openCatalog(page);
   await expect(page.locator('.artwork')).toHaveAttribute('data-state', 'ready');
@@ -91,18 +91,18 @@ test('shows the newly selected identity when artwork is missing or broken', asyn
   await expect(page.getByRole('img', { name: 'Artwork from July 2026', exact: true })).toBeVisible();
 });
 
-test('resets artwork on catalog refresh even when the playlist ID stays the same', async ({ page }) => {
-  const response = responseWithArtwork();
-  const refreshResponse = structuredClone(response);
+test('resets artwork after an update check even when the playlist ID stays the same', async ({ page }) => {
+  const catalog = catalogWithArtwork();
+  const updatedCatalog = structuredClone(catalog);
   const refreshedUrl = 'https://example.test/art/revised.jpg';
-  refreshResponse.catalog.playlists[0].artworkUrl = refreshedUrl;
-  await installAppHarness(page, { response, refreshResponse });
+  updatedCatalog.playlists[0].artworkUrl = refreshedUrl;
+  await installAppHarness(page, { catalog, updatedCatalog });
   const pending = await deferArtwork(page, refreshedUrl);
   await openCatalog(page);
   await expect(page.locator('.artwork')).toHaveAttribute('data-state', 'ready');
   const oldImage = await page.locator('.artwork img').elementHandle();
 
-  await page.getByRole('button', { name: 'Refresh playlist archive' }).click();
+  await page.getByRole('button', { name: 'Check for playlist updates' }).click();
   await expect(page.locator('.artwork')).toHaveAttribute('data-state', 'loading');
   await expect(page.locator('.artwork img')).toHaveAttribute('src', refreshedUrl);
   await expect(page.locator('.artwork img')).toBeHidden();

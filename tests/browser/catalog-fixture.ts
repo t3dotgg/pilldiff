@@ -1,4 +1,4 @@
-import type { Catalog, CatalogResponse, Playlist, Track } from '../../shared/types';
+import type { Catalog, Playlist, Track } from '../../shared/types';
 
 function track(overrides: Partial<Track> & Pick<Track, 'id' | 'provider' | 'title' | 'position'>): Track {
   return {
@@ -109,11 +109,3 @@ export const browserCatalog: Catalog = {
   totalPosts: 40,
   playlists: [summerPlaylist, collectionPlaylist],
 };
-
-export function catalogResponse(overrides: Partial<CatalogResponse> = {}): CatalogResponse {
-  return {
-    catalog: browserCatalog,
-    stale: false,
-    ...overrides,
-  };
-}

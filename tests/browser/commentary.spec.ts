@@ -1,18 +1,18 @@
 import { expect, test } from '@playwright/test';
-import { catalogResponse } from './catalog-fixture';
+import { browserCatalog } from './catalog-fixture';
 import { installAppHarness } from './harness';
 import { clearSdkCalls, finishProvider, openCatalog, providerCalls, selectPlaylist, waitForProviderPlaying } from './test-helpers';
 
-function responseWithNotes() {
-  const response = structuredClone(catalogResponse());
-  response.catalog.playlists[0].tracks[0].description = 'An opening note with a little room to breathe.\n\nA second paragraph with <img src=x onerror=alert(1)> as plain text.';
-  response.catalog.playlists[0].tracks[1].description = 'A different note for the SoundCloud song.';
-  response.catalog.playlists[1].tracks[0].description = 'An album note from the other playlist.';
-  return response;
+function catalogWithNotes() {
+  const catalog = structuredClone(browserCatalog);
+  catalog.playlists[0].tracks[0].description = 'An opening note with a little room to breathe.\n\nA second paragraph with <img src=x onerror=alert(1)> as plain text.';
+  catalog.playlists[0].tracks[1].description = 'A different note for the SoundCloud song.';
+  catalog.playlists[1].tracks[0].description = 'An album note from the other playlist.';
+  return catalog;
 }
 
 test('renders expandable plain-text notes without starting playback', async ({ page }) => {
-  await installAppHarness(page, { response: responseWithNotes() });
+  await installAppHarness(page, { catalog: catalogWithNotes() });
   await openCatalog(page);
   await clearSdkCalls(page);
   const row = page.locator('.track-list > li').filter({ has: page.getByRole('button', { name: 'Play Sunrise Relay', exact: true }) });
@@ -24,7 +24,7 @@ test('renders expandable plain-text notes without starting playback', async ({ p
   await expect(row.locator('.notes-prose p')).toHaveCount(2);
   await expect(row.getByText(/<img src=x onerror=alert\(1\)>/)).toBeVisible();
   await expect(row.locator('.notes-prose img, .notes-prose script')).toHaveCount(0);
-  await expect(row.getByRole('link', { name: 'Read on the blog' })).toHaveAttribute('href', responseWithNotes().catalog.playlists[0].sourceUrl);
+  await expect(row.getByRole('link', { name: 'Read on the blog' })).toHaveAttribute('href', catalogWithNotes().playlists[0].sourceUrl);
 
   await summary.focus();
   await page.keyboard.press('Space');
@@ -35,7 +35,7 @@ test('renders expandable plain-text notes without starting playback', async ({ p
 });
 
 test('keeps notes with their song across reversing, browsing, and provider handoff', async ({ page }) => {
-  await installAppHarness(page, { response: responseWithNotes() });
+  await installAppHarness(page, { catalog: catalogWithNotes() });
   await openCatalog(page);
   await page.getByRole('button', { name: 'Reverse', exact: true }).click();
   const firstRow = page.locator('.track-list > li').first();
@@ -60,17 +60,17 @@ test('keeps notes with their song across reversing, browsing, and provider hando
   await expect(currentNotes.getByText('An opening note with a little room to breathe.')).toHaveCount(0);
 });
 
-test('keeps active editorial notes unchanged when the browsing catalog refreshes', async ({ page }) => {
-  const response = responseWithNotes();
-  const refreshResponse = structuredClone(response);
-  refreshResponse.catalog.playlists[0].tracks[0].description = 'An edited note in the refreshed catalog.';
-  await installAppHarness(page, { response, refreshResponse });
+test('keeps active editorial notes unchanged when the browsing catalog updates', async ({ page }) => {
+  const catalog = catalogWithNotes();
+  const updatedCatalog = structuredClone(catalog);
+  updatedCatalog.playlists[0].tracks[0].description = 'An edited note in the updated catalog.';
+  await installAppHarness(page, { catalog, updatedCatalog });
   await openCatalog(page);
   await page.getByRole('button', { name: 'Play selected playlist' }).click();
   await waitForProviderPlaying(page, 'youtube');
-  await page.getByRole('button', { name: 'Refresh playlist archive' }).click();
+  await page.getByRole('button', { name: 'Check for playlist updates' }).click();
   await page.locator('.track-list summary').first().click();
-  await expect(page.locator('.track-list').getByText('An edited note in the refreshed catalog.')).toBeVisible();
+  await expect(page.locator('.track-list').getByText('An edited note in the updated catalog.')).toBeVisible();
   await expect(page.locator('.now-playing-notes').getByText('An opening note with a little room to breathe.')).toBeVisible();
   await waitForProviderPlaying(page, 'youtube');
 });

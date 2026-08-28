@@ -1,6 +1,11 @@
 node_modules/
 dist/
 .cache/
+.vercel/
+public/catalog.json
+.env
+.env.*
+!.env.example
 .DS_Store
 playwright-report/
 test-results/
