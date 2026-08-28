@@ -61,6 +61,8 @@ test('checked seed retains audited live archive coverage', async () => {
     final2025?.tracks.filter((track) => track.rank === 3).map((track) => ({
       id: track.id,
       label: track.label,
+      artist: track.artist,
+      title: track.title,
       sourceUrl: track.sourceUrl,
       playbackUrl: track.playbackUrl,
       rank: track.rank,
@@ -70,6 +72,8 @@ test('checked seed retains audited live archive coverage', async () => {
       {
         id: '19ba6938fb86df849711',
         label: 'snoa- Agenda [Olswel]',
+        artist: 'snoa',
+        title: 'Agenda [Olswel]',
         sourceUrl: 'https://soundcloud.com/snoa247/agenda-prod-olswel',
         playbackUrl: 'https://api.soundcloud.com/tracks/2099816094',
         rank: 3,
@@ -78,6 +82,8 @@ test('checked seed retains audited live archive coverage', async () => {
       {
         id: '92a97c201d809e8747bf',
         label: 'hear me now [444jet, chinapoet]',
+        artist: 'snoa',
+        title: 'hear me now [444jet, chinapoet]',
         sourceUrl: 'https://soundcloud.com/snoa247/hearmenow',
         playbackUrl: 'https://api.soundcloud.com/tracks/2128892289',
         rank: 3,

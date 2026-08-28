@@ -14,6 +14,50 @@ function entry(title: string, content: string, id = '1'): BloggerEntry {
   };
 }
 
+test('extracts artists from singly spaced hyphens and fully spaced Unicode dashes', () => {
+  const examples = [
+    { label: 'Artist - Song', artist: 'Artist', title: 'Song' },
+    { label: 'Artist- Song', artist: 'Artist', title: 'Song' },
+    { label: 'Artist -Song', artist: 'Artist', title: 'Song' },
+    { label: 'Artist – Song', artist: 'Artist', title: 'Song' },
+    { label: 'Artist — Song', artist: 'Artist', title: 'Song' },
+    { label: 'Artist-Name- Post-punk Song', artist: 'Artist-Name', title: 'Post-punk Song' },
+  ];
+  for (const expected of examples) {
+    const playlist = parsePost(entry("billdifferen's top songs of 2024", `
+      <h1>1. <a href="https://soundcloud.com/artist/song">${expected.label}</a></h1>
+    `));
+    assert.ok(playlist);
+    assert.equal(playlist.tracks.length, 1);
+    const { label, artist, title } = playlist.tracks[0];
+    assert.deepEqual({ label, artist, title }, expected, expected.label);
+  }
+});
+
+test('preserves word hyphens, repeated dashes, and one-sided Unicode attribution', () => {
+  const labels = [
+    'Artist-Song',
+    'Artist -- Song',
+    'Artist-- Song',
+    'Artist ---Song',
+    "NEGRO 5 ESTRELLAS --V-- ELLA TA' --V-- REMISERIA TEMPERLEY X CIAN ZANGOLOTEO 140 BPM EDIT",
+    'Artist– Song',
+    'Artist —Song',
+    'Happy Goat y3ar!!!🐐🐐🐐🐐 pic.twitter.com/xLH9hje9kg— YungD1s3 (@YungD1se) January 1, 2022',
+    '- Song',
+  ];
+  for (const label of labels) {
+    const playlist = parsePost(entry("billdifferen's top songs of 2024", `
+      <h1>1. <a href="https://soundcloud.com/artist/song">${label}</a></h1>
+    `));
+    assert.ok(playlist);
+    assert.equal(playlist.tracks.length, 1);
+    assert.equal(playlist.tracks[0].label, label);
+    assert.equal(playlist.tracks[0].artist, '', label);
+    assert.equal(playlist.tracks[0].title, label);
+  }
+});
+
 test('extracts mixed providers in document order and pairs official embeds', () => {
   const playlist = parsePost(entry('billdifferen\'s favorite music of july 2024', `
     <h2>3. <a href="https://www.youtube.com/watch?v=0VNQ4GemnCY">Untold - Bluebells</a></h2>
@@ -74,6 +118,8 @@ test('pairs distinct SoundCloud songs inside one ranked Blogger heading', () => 
     playlist.tracks.slice(-2).map((track) => ({
       id: track.id,
       label: track.label,
+      artist: track.artist,
+      title: track.title,
       sourceUrl: track.sourceUrl,
       playbackUrl: track.playbackUrl,
       rank: track.rank,
@@ -84,6 +130,8 @@ test('pairs distinct SoundCloud songs inside one ranked Blogger heading', () => 
       {
         id: '19ba6938fb86df849711',
         label: 'snoa- Agenda [Olswel]',
+        artist: 'snoa',
+        title: 'Agenda [Olswel]',
         sourceUrl: 'https://soundcloud.com/snoa247/agenda-prod-olswel',
         playbackUrl: 'https://api.soundcloud.com/tracks/2099816094',
         rank: 3,
@@ -93,6 +141,8 @@ test('pairs distinct SoundCloud songs inside one ranked Blogger heading', () => 
       {
         id: '92a97c201d809e8747bf',
         label: 'hear me now [444jet, chinapoet]',
+        artist: 'snoa',
+        title: 'hear me now [444jet, chinapoet]',
         sourceUrl: 'https://soundcloud.com/snoa247/hearmenow',
         playbackUrl: 'https://api.soundcloud.com/tracks/2128892289',
         rank: 3,
@@ -101,6 +151,98 @@ test('pairs distinct SoundCloud songs inside one ranked Blogger heading', () => 
       },
     ],
   );
+});
+
+test('shares only unambiguous preceding artists with matching SoundCloud profiles', () => {
+  const examples = [
+    {
+      name: 'case-normalized names preserve explicit spelling and never propagate backwards',
+      songs: [
+        { url: 'https://soundcloud.com/profile/first', label: 'First song' },
+        { url: 'https://soundcloud.com/profile/second', label: 'Artist - Second song' },
+        { url: 'https://soundcloud.com/profile/third', label: 'ARTIST - Third song' },
+        { url: 'https://soundcloud.com/profile/fourth', label: 'Fourth song' },
+      ],
+      artists: ['', 'Artist', 'ARTIST', 'ARTIST'],
+    },
+    {
+      name: 'different creator profiles do not share attribution',
+      songs: [
+        { url: 'https://soundcloud.com/profile/first', label: 'Artist - First song' },
+        { url: 'https://soundcloud.com/other-profile/second', label: 'Second song' },
+      ],
+      artists: ['Artist', ''],
+    },
+    {
+      name: 'conflicting explicit artists prevent inheritance',
+      songs: [
+        { url: 'https://soundcloud.com/profile/first', label: 'Artist - First song' },
+        { url: 'https://soundcloud.com/profile/second', label: 'Other Artist - Second song' },
+        { url: 'https://soundcloud.com/profile/third', label: 'Third song' },
+      ],
+      artists: ['Artist', 'Other Artist', ''],
+    },
+    {
+      name: 'numeric API URLs do not identify a creator',
+      songs: [
+        { url: 'https://api.soundcloud.com/tracks/2099816094', label: 'Artist - First song' },
+        { url: 'https://api.soundcloud.com/tracks/2128892289', label: 'Second song' },
+      ],
+      artists: ['Artist', ''],
+    },
+    {
+      name: 'profile handles alone do not supply artist names',
+      songs: [
+        { url: 'https://soundcloud.com/profile/first', label: 'First song' },
+        { url: 'https://soundcloud.com/profile/second', label: 'Second song' },
+      ],
+      artists: ['', ''],
+    },
+    {
+      name: 'YouTube links do not establish shared creator ownership',
+      songs: [
+        { url: 'https://www.youtube.com/watch?v=0VNQ4GemnCY', label: 'Artist - First song' },
+        { url: 'https://www.youtube.com/watch?v=qjIIxuV6DS0', label: 'Second song' },
+      ],
+      artists: ['Artist', ''],
+    },
+  ];
+  for (const example of examples) {
+    const anchors = example.songs.map((song) => `<a href="${song.url}">${song.label}</a>`).join(' / ');
+    const embeds = example.songs.map((song) => {
+      const media = parseSupportedMedia(song.url);
+      assert.ok(media);
+      const embedUrl = media.provider === 'soundcloud'
+        ? `https://w.soundcloud.com/player/?url=${encodeURIComponent(media.playbackUrl)}`
+        : media.playbackUrl;
+      return `<iframe src="${embedUrl}"></iframe>`;
+    }).join('');
+    const playlist = parsePost(entry("billdifferen's top songs of 2024", `<h1>3. ${anchors}${embeds}</h1>`));
+    assert.ok(playlist);
+    assert.equal(playlist.tracks.length, example.songs.length, example.name);
+    assert.deepEqual(playlist.tracks.map((track) => track.label), example.songs.map((song) => song.label), example.name);
+    assert.deepEqual(playlist.tracks.map((track) => track.artist), example.artists, example.name);
+  }
+});
+
+test('does not inherit artists across separate blocks or ranks', () => {
+  const playlist = parsePost(entry("billdifferen's top songs of 2024", `
+    <h1>3. <a href="https://soundcloud.com/profile/first">Artist - First song</a>
+      <iframe src="https://w.soundcloud.com/player/?url=https%3A%2F%2Fsoundcloud.com%2Fprofile%2Ffirst"></iframe>
+    </h1>
+    <h1>3. <a href="https://soundcloud.com/profile/second">Second song</a>
+      <iframe src="https://w.soundcloud.com/player/?url=https%3A%2F%2Fsoundcloud.com%2Fprofile%2Fsecond"></iframe>
+    </h1>
+    <h1>2. <a href="https://soundcloud.com/profile/third">Third song</a>
+      <iframe src="https://w.soundcloud.com/player/?url=https%3A%2F%2Fsoundcloud.com%2Fprofile%2Fthird"></iframe>
+    </h1>
+  `));
+  assert.ok(playlist);
+  assert.deepEqual(playlist.tracks.map((track) => ({ rank: track.rank, artist: track.artist, title: track.title })), [
+    { rank: 3, artist: 'Artist', title: 'First song' },
+    { rank: 3, artist: '', title: 'Second song' },
+    { rank: 2, artist: '', title: 'Third song' },
+  ]);
 });
 
 test('prefers exact media identity when shared-entry embeds are reversed', () => {

@@ -76,6 +76,11 @@ interface MediaEvent {
   attribution?: { label: string; sourceUrl: string };
 }
 
+interface SharedEntryPair {
+  iframe: MediaEvent;
+  artistFallback?: string;
+}
+
 interface HeadingContext {
   order: number;
   text: string;
@@ -378,11 +383,11 @@ function findAttribution(document: CheerioAPI, elementOrder: WeakMap<object, num
 }
 
 function splitLabel(label: string): { artist: string; title: string } {
-  const delimiter = label.match(/\s+(?:-|–|—)\s+/);
+  const delimiter = label.match(/\s+-(?!-)\s*|(?<!-)-\s+|\s+[–—]\s+/);
   if (!delimiter || delimiter.index === undefined) return { artist: '', title: label };
   const artist = label.slice(0, delimiter.index).trim();
   const title = label.slice(delimiter.index + delimiter[0].length).trim();
-  return title ? { artist, title } : { artist: '', title: label };
+  return artist && title ? { artist, title } : { artist: '', title: label };
 }
 
 function stableId(...parts: Array<string | number>): string {
@@ -466,7 +471,7 @@ function extractMediaEvents(document: CheerioAPI): { events: MediaEvent[]; bandc
   return { events, bandcamp, other, skippedSources };
 }
 
-function pairSharedEntryMedia(events: MediaEvent[]): Map<MediaEvent, MediaEvent> {
+function pairSharedEntryMedia(events: MediaEvent[]): Map<MediaEvent, SharedEntryPair> {
   const groups = new Map<string, MediaEvent[]>();
   for (const event of events) {
     if (event.rank === undefined) continue;
@@ -474,7 +479,7 @@ function pairSharedEntryMedia(events: MediaEvent[]): Map<MediaEvent, MediaEvent>
     groups.set(key, [...(groups.get(key) ?? []), event]);
   }
 
-  const pairs = new Map<MediaEvent, MediaEvent>();
+  const pairs = new Map<MediaEvent, SharedEntryPair>();
   for (const group of groups.values()) {
     const anchors = group.filter((event) => event.type === 'anchor');
     const iframes = group.filter((event) => event.type === 'iframe');
@@ -533,7 +538,21 @@ function pairSharedEntryMedia(events: MediaEvent[]): Map<MediaEvent, MediaEvent>
       }
     }
     if (unmatchedAnchors.size > 0 || unmatchedIframes.size > 0) continue;
-    for (const [anchor, iframe] of groupPairs) pairs.set(anchor, iframe);
+    const explicitArtists = anchors.map((anchor) => splitLabel(anchor.directLabel ?? anchor.label).artist);
+    const distinctArtists = new Set(explicitArtists.filter(Boolean).map((artist) => artist.toLocaleLowerCase()));
+    let precedingArtist: { artist: string; creator: string } | undefined;
+    for (const [anchorIndex, anchor] of anchors.entries()) {
+      const artist = explicitArtists[anchorIndex];
+      const source = safeUrl(anchor.media.sourceUrl);
+      const creator = anchor.media.provider === 'soundcloud' && source?.hostname === 'soundcloud.com'
+        ? source.pathname.split('/')[1]?.toLowerCase()
+        : undefined;
+      const artistFallback = !artist && distinctArtists.size === 1 && creator && creator === precedingArtist?.creator
+        ? precedingArtist.artist
+        : undefined;
+      pairs.set(anchor, { iframe: groupPairs.get(anchor)!, artistFallback });
+      if (artist && creator) precedingArtist = { artist, creator };
+    }
   }
   return pairs;
 }
@@ -576,11 +595,18 @@ function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank
   const selections: TrackSelection[] = [];
   const representedRanks = new Set<number>();
   const rankedAnchors = normalizedEvents.filter((event) => event.type === 'anchor' && event.rank !== undefined);
-  const pairedIframes = new Set(sharedEntryPairs.values());
+  const pairedIframes = new Set([...sharedEntryPairs.values()].map((pair) => pair.iframe));
   const firstRankedOrder = rankedAnchors[0]?.order;
   const lastRankedOrder = rankedAnchors.at(-1)?.order;
 
-  const appendTrack = (mediaEvent: MediaEvent, label: string, rank: number | undefined, sourceUrl: string, sources = mediaEvent.nodes): void => {
+  const appendTrack = (
+    mediaEvent: MediaEvent,
+    label: string,
+    rank: number | undefined,
+    sourceUrl: string,
+    sources = mediaEvent.nodes,
+    artistFallback = '',
+  ): void => {
     if (singleTrackPerRank && rank !== undefined && representedRanks.has(rank)) return;
     const cleanLabel = stripRank(label || mediaEvent.attribution?.label || `${mediaEvent.media.provider === 'youtube' ? 'YouTube' : 'SoundCloud'} ${mediaEvent.media.kind}`);
     const { artist, title } = splitLabel(cleanLabel);
@@ -589,7 +615,7 @@ function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank
       id: stableId(postId, position, mediaEvent.media.provider, mediaEvent.media.fingerprint),
       provider: mediaEvent.media.provider,
       title,
-      artist,
+      artist: artist || artistFallback,
       label: cleanLabel,
       sourceUrl,
       playbackUrl: mediaEvent.media.playbackUrl,
@@ -618,8 +644,9 @@ function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank
       continue;
     }
 
-    const sharedEntryIframe = sharedEntryPairs.get(event);
-    if (sharedEntryIframe) {
+    const sharedEntryPair = sharedEntryPairs.get(event);
+    if (sharedEntryPair) {
+      const sharedEntryIframe = sharedEntryPair.iframe;
       const sourceUrl = sharedEntryIframe.media.provider === event.media.provider
         ? event.media.sourceUrl
         : sharedEntryIframe.attribution?.sourceUrl ?? sharedEntryIframe.media.sourceUrl;
@@ -629,6 +656,7 @@ function eventsToTracks(events: MediaEvent[], postId: string, singleTrackPerRank
         event.rank ?? sharedEntryIframe.rank,
         sourceUrl,
         sharedEntryIframe.nodes,
+        sharedEntryPair.artistFallback,
       );
       continue;
     }
