@@ -1,0 +1,36 @@
+name: Rebuild catalog
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: rebuild-catalog
+  cancel-in-progress: false
+
+jobs:
+  request-deployment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Request Vercel deployment
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "${VERCEL_DEPLOY_HOOK}" ]; then
+            echo "::error::The VERCEL_DEPLOY_HOOK repository secret is not configured."
+            exit 1
+          fi
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --request POST \
+            --connect-timeout 5 \
+            --max-time 20 \
+            --output /dev/null \
+            "${VERCEL_DEPLOY_HOOK}"
+
+          echo "Vercel accepted the deployment request. Check Vercel for the build result."

@@ -6,14 +6,14 @@ The interface takes its black, white, and red palette from the blog, with the or
 
 ## Run locally
 
-Requires Node.js 24 or newer.
+Requires Node.js 24.x.
 
 ```sh
 npm install
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. Keeping the app on a normal local HTTP origin matters: YouTube embeds rely on an origin and Referer, and the server sends `strict-origin-when-cross-origin` for that reason.
+Open `http://127.0.0.1:5173`. Keeping the app on a normal local HTTP origin matters: YouTube embeds rely on an origin and Referer, and the app sends `strict-origin-when-cross-origin` for that reason. Local development uses the committed catalog snapshot and does not contact Blogger.
 
 Other commands:
 
@@ -23,9 +23,12 @@ npx playwright install chromium
 npm run test:e2e
 PLAYWRIGHT_CHANNEL=chrome npm run test:e2e
 npm run build
+npm run build:snapshot
 npm start
 npm run sync
 ```
+
+`npm run build` imports and validates the live Blogger feed before creating the static `dist` directory. It fails instead of silently publishing stale data when the live import is unavailable or invalid. `npm run build:snapshot` creates the same frontend from the committed `data/catalog.json` without network access. `npm start` previews the most recent build on `http://127.0.0.1:4173`.
 
 `npm run test:e2e` is the deterministic browser suite: it mocks both provider SDKs and uses Playwright's installed Chromium by default. Run `npx playwright install chromium` once on a fresh machine, or set `PLAYWRIGHT_CHANNEL=chrome` to use system Chrome.
 
@@ -35,72 +38,53 @@ The optional live smoke check drives the real provider embeds and can be affecte
 PLAYWRIGHT_CHANNEL=chrome npm run test:live
 ```
 
-Set `PLAYWRIGHT_BASE_URL` when the app is not on `http://127.0.0.1:5173`, or set `PILLDIFF_LIVE_HANDOFF=0` to skip its near-end handoff attempt. `npm start` serves the production `dist` build on port 5173; `PORT` and `HOST` can override the defaults.
+Set `PLAYWRIGHT_BASE_URL` when the app is not on `http://127.0.0.1:5173`, or set `PILLDIFF_LIVE_HANDOFF=0` to skip its near-end handoff attempt.
 
 ## How it works
 
 - `server/importer.ts` reads every page of the fixed Blogger JSON feed, treats native embeds and ranked link-only entries as the playlist, pairs cross-provider headings with their embed, and excludes posts with no supported tracks.
-- `data/catalog.json` is the checked-in seed, so the library is available immediately without a network request.
-- `GET /api/catalog` returns the newest valid disk cache or seed and marks snapshots older than 24 hours as stale.
-- `POST /api/catalog/refresh` performs a same-origin, deduplicated refresh with a short cooldown. A complete validated result goes to ignored `.cache/catalog.json`; failures preserve the known-good catalog.
-- `npm run sync` deliberately replaces the checked-in seed atomically. Normal app refreshes never modify tracked data.
-- `shared/types.ts` is the contract used by the React client and Node server.
+- A production build writes the validated result to ignored `public/catalog.json`, then Vite includes it as static `/catalog.json` in `dist`.
+- `data/catalog.json` is the checked-in snapshot for deterministic offline development and builds. `npm run sync` deliberately refreshes that snapshot atomically.
+- The archive's **Check for updates** action only reloads the currently deployed `/catalog.json`; it never imports Blogger or starts a deployment.
+- `api/firecrawl.ts` is an optional signed webhook that filters Firecrawl change notifications and requests a Vercel rebuild. It does not serve catalog data.
+- `shared/types.ts` is the contract used by the importer and React client.
 
-The catalog stores post metadata, media URLs or IDs, and Bill's per-entry commentary when present. Notes are plain text with paragraph breaks, not executable blog HTML. The importer keeps them within entry boundaries, skips widget attribution and unrelated post introductions, and does not invent notes for link-only lists. Schema version 2 invalidates older caches that lack this enrichment. The importer only contacts the fixed `billdifferen.blogspot.com` feed and is not a general-purpose fetch proxy. No API keys, accounts, media downloads, or unofficial streams are used.
+The catalog stores post metadata, media URLs or IDs, and Bill's per-entry commentary when present. Notes are plain text with paragraph breaks, not executable blog HTML. The importer keeps them within entry boundaries, skips widget attribution and unrelated post introductions, and does not invent notes for link-only lists. Schema version 2 invalidates older catalog snapshots that lack this enrichment. The importer only contacts the fixed `billdifferen.blogspot.com` feed and is not a general-purpose fetch proxy. Catalog import and playback use no API keys, accounts, media downloads, or unofficial streams.
 
 ## Playback notes
 
 Browsers require an initial user gesture before autoplay with sound. Provider policy can also require another click during a YouTube-to-SoundCloud handoff. Ads, removed uploads, private tracks, region restrictions, and provider-side embed blocks remain under YouTube or SoundCloud control.
 
-Unit tests exercise parser ordering, link normalization, provider pairing, Bandcamp skipping, pagination, and cache-failure safety with small synthetic fixtures. Browser tests use mocked provider APIs to verify app orchestration; they do not guarantee that a live third-party embed will autoplay in a particular browser session.
+Unit tests exercise parser ordering, link normalization, provider pairing, Bandcamp skipping, pagination, catalog-generation failure safety, playback queues, and webhook filtering with small synthetic fixtures. Browser tests use mocked provider APIs to verify app orchestration; they do not guarantee that a live third-party embed will autoplay in a particular browser session.
 
 Source playlists and editorial selection are by billdifferen. This project is unofficial and is not affiliated with the blog, YouTube, or SoundCloud.
 
 ## Deployment
 
-This is one Node.js web service, not a static-only Vite site. The same process serves the built frontend and catalog API. No database, provider API keys, authentication setup, or separate worker is required. Audio and video stream directly from the official provider embeds, not through this server.
+The player is a static Vite frontend on Vercel. Catalog import happens during the build, playback runs in the browser through official provider embeds, and listener preferences stay in browser storage. There is no application server, database, KV store, writable cache, volume, authentication system, media proxy, or background worker.
 
-### Railway
+The only optional runtime code is `/api/firecrawl`, a small Vercel function that can receive a signed source-change notification and call a deploy hook. It never imports the catalog, handles playback, or stores state.
 
-The included multi-stage `Dockerfile` provides the build and start commands, Node 24, a non-root runtime, and a writable catalog cache. Railway detects the root Dockerfile automatically.
+### Vercel
 
-When ready to publish:
+1. Push this repository to GitHub and import it as a Git-connected Vercel project.
+2. Vercel reads `vercel.json`, runs `npm run build` with Node 24, and publishes `dist`.
+3. Deploy once with no environment variables if automatic monitoring is not ready yet. The static player and build-time catalog need no credentials.
+4. Open the production URL and test a real YouTube-to-SoundCloud and SoundCloud-to-YouTube transition after an initial click.
 
-1. Push this Git repository to GitHub and connect it as a Railway service. Alternatively, deploy this directory with the Railway CLI after selecting the intended project and service.
-2. Set `PORT=8080`. The Dockerfile already sets `HOST=0.0.0.0` and `NODE_ENV=production`; no secrets are needed.
-3. Set the service's healthcheck path to `/api/health` in its deployment settings. Configure this explicitly even though the Docker image also contains a local healthcheck.
-4. Generate a public domain under Networking, targeting port `8080`. Railway handles HTTPS; a custom domain is optional.
-5. Wait for a successful deployment and healthcheck, then open the public URL and test playback with a real click. Check both YouTube-to-SoundCloud and SoundCloud-to-YouTube transitions in the intended browser.
+Every deployment imports the current Blogger feed. A failed import or validation fails the new build, so Vercel leaves the existing production deployment in place. The committed snapshot is intentionally reserved for local/offline use and is not an automatic production fallback. Keep the `strict-origin-when-cross-origin` Referrer-Policy and avoid an iframe policy that blocks YouTube or SoundCloud.
 
-There is no Railway project, domain, or account configuration checked into this repository. Adding these files does not deploy anything or create billable resources. Hosting charges depend on the provider plan and actual usage.
+### Manual rebuild
 
-### Run the container locally
+Create a Vercel deploy hook for the `main` branch under **Project Settings → Git → Deploy Hooks**. Add its full URL as the `VERCEL_DEPLOY_HOOK` secret in the GitHub repository, then use **Actions → Rebuild catalog → Run workflow** whenever an immediate import is needed. The workflow has no schedule and does not check out or rebuild the repository itself; it asks Vercel to build the current `main` branch. A green workflow means Vercel accepted the request, not that the deployment ultimately succeeded.
 
-With a running Docker engine:
+The workflow must exist on the repository's default branch before GitHub exposes **Run workflow**. Treat the deploy-hook URL as a password: do not commit it or expose it to client code.
 
-```sh
-docker build -t pilldiff .
-docker run --rm -p 127.0.0.1:8080:8080 pilldiff
-```
+### Automatic rebuilds
 
-Open `http://127.0.0.1:8080`. The container includes the seed catalog and built frontend, and installs only production dependencies in its runtime stage. `PORT` is read at runtime, so another host can supply its own value.
+Firecrawl can monitor the blog on a schedule and notify `/api/firecrawl` when its completed check finds a new, changed, or removed page. The endpoint verifies Firecrawl's raw-body HMAC signature, accepts only the configured monitor, ignores unsuccessful or error-containing checks, and calls the same Vercel deploy hook once for a qualifying event.
 
-Without Docker, the equivalent production commands on any Node 24 host are:
-
-```sh
-npm ci
-npm run build
-npm prune --omit=dev
-HOST=0.0.0.0 PORT=8080 npm start
-```
-
-Pruning is intended for a deployment checkout; use `npm ci` again before developing or building there. Put HTTPS in front of the service when hosting it publicly. Do not remove the server's `strict-origin-when-cross-origin` Referrer-Policy or add a restrictive iframe policy that blocks the YouTube and SoundCloud players.
-
-### Catalog storage and updates
-
-The checked-in seed makes cold starts independent of Blogger availability. The **Refresh** button fetches the complete source feed and writes `.cache/catalog.json`; failed refreshes leave the last known catalog intact. Refresh is same-origin checked, deduplicated, and limited by a per-process cooldown. It is not an admin-only endpoint.
-
-The cache is disposable: a new deployment or replacement container starts from the bundled seed unless persistent storage is configured. No volume is needed for the first deployment. Use **Refresh** after a redeploy to pick up new posts, or run `npm run sync` locally and commit the updated seed before releasing. Playback preferences stay in each listener's browser. For a simple personal deployment, keep one replica; cache and refresh coordination are not shared across replicas.
+Automatic monitoring requires three Vercel Production environment variables listed in `.env.example`: `FIRECRAWL_WEBHOOK_SECRET`, `FIRECRAWL_MONITOR_ID`, and `VERCEL_DEPLOY_HOOK`. No Firecrawl API key belongs in the app or GitHub. See [Firecrawl monitoring setup](docs/firecrawl-monitoring.md) for the safe setup order, whole-blog crawl configuration, detection limitations, and official references.
 
 ### Typeface
 
