@@ -76,8 +76,8 @@ test('fits desktop and narrow viewports while mobile archive browsing preserves 
   await page.getByRole('button', { name: 'Open playlist archive' }).click();
   const archive = page.getByRole('complementary', { name: 'Playlist archive' });
   await expect(archive).toBeVisible();
-  await page.getByPlaceholder('Search playlists or tracks').fill('Cloud Sequence');
-  await expect(archive.getByText('1 playlist', { exact: true })).toBeVisible();
+  await archive.getByRole('searchbox', { name: 'Search playlists and tracks' }).fill('Cloud Sequence');
+  await expect(archive.locator('.archive-playlist-link')).toHaveCount(1);
   await archive.getByRole('link', { name: /^Collections 2025/ }).click();
   await expect(page.getByRole('heading', { name: 'Collections 2025 — Long Players' })).toBeVisible();
 

@@ -58,6 +58,22 @@ for (const width of [1440, 1100, 901, 390, 320]) {
   test(`keeps reading-list titles complete at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     const archive = await openArchive(page);
+    const tools = archive.locator('.archive-tools');
+    const search = tools.getByRole('searchbox', { name: 'Search playlists and tracks' });
+    await expect(search).toHaveCount(1);
+    await expect(search).toBeVisible();
+    await expect(search).toHaveAttribute('placeholder', 'Search playlists');
+    await expect(tools).toHaveText('');
+    await expect(tools.getByRole('heading')).toHaveCount(0);
+    await expect(archive.getByRole('combobox')).toHaveCount(0);
+    await expect(archive.locator('.archive-mobile-head, .archive-count')).toHaveCount(0);
+    expect((await tools.boundingBox())!.height).toBeLessThanOrEqual(80);
+    const close = tools.getByRole('button', { name: 'Close playlist archive' });
+    if (width <= 900) {
+      await expect(close).toBeVisible();
+    } else {
+      await expect(close).toBeHidden();
+    }
     const link = archive.locator(`[data-playlist-id="${readingPlaylist.id}"]`);
     const title = link.locator('.archive-card-title');
     await expect(title).toHaveText(longTitle);
@@ -116,29 +132,43 @@ test('groups years once and keeps only useful metadata in each row', async ({ pa
     .toHaveAttribute('href', readingPlaylist.sourceUrl);
 });
 
-test('keeps search, year, series, count, and filter recovery working', async ({ page }) => {
+test('searches titles, artists, years, and series with clear and empty-state recovery', async ({ page }) => {
   const archive = await openArchive(page);
   const search = archive.getByRole('searchbox', { name: 'Search playlists and tracks' });
-  const year = archive.getByRole('combobox', { name: 'Filter by year' });
-  const series = archive.getByRole('combobox', { name: 'Filter by category' });
   const count = archive.getByRole('status');
+  const links = archive.locator('.archive-playlist-link');
   await expect(count).toHaveText('4 playlists');
-  await year.selectOption('2025');
-  await series.selectOption(collectionPlaylist.category);
-  await search.fill('  cloud sequence artist  ');
-  await expect(count).toHaveText('1 playlist');
-  await expect(archive.locator('.archive-playlist-link')).toHaveCount(1);
-  await expect(archive.locator('.archive-playlist-link')).toHaveAttribute('href', playlistPath(collectionPlaylist.id));
+  await expect(count).toHaveClass('sr-only');
+  await expect(archive.getByRole('button', { name: 'Clear search', exact: true })).toHaveCount(0);
 
-  await archive.getByRole('button', { name: 'Clear', exact: true }).click();
+  for (const { query, expectedIds } of [
+    { query: '  cloud sequence artist  ', expectedIds: [collectionPlaylist.id] },
+    { query: '2024', expectedIds: [singleEntryPlaylist.id] },
+    { query: 'features', expectedIds: [singleEntryPlaylist.id] },
+    { query: 'monthly MIX', expectedIds: [readingPlaylist.id, laterMonthlyPlaylist.id] },
+    { query: 'another month of discoveries', expectedIds: [laterMonthlyPlaylist.id] },
+  ]) {
+    await search.fill(query);
+    await expect(links).toHaveCount(expectedIds.length);
+    await expect(count).toHaveText(`${expectedIds.length} ${expectedIds.length === 1 ? 'playlist' : 'playlists'}`);
+    expect(await links.evaluateAll((elements) => elements.map((element) => element.getAttribute('data-playlist-id'))))
+      .toEqual(expectedIds);
+  }
+
+  await archive.getByRole('button', { name: 'Clear search', exact: true }).click();
   await expect(search).toHaveValue('');
-  await expect(year).toHaveValue('');
-  await expect(series).toHaveValue('');
+  await expect(search).toBeFocused();
+  await expect(links).toHaveCount(4);
   await expect(count).toHaveText('4 playlists');
+  await expect(archive.getByRole('button', { name: 'Clear search', exact: true })).toHaveCount(0);
   await search.fill('there-is-no-playlist-with-this-title');
   await expect(count).toHaveText('0 playlists');
-  await expect(archive.locator('.archive-playlist-link')).toHaveCount(0);
-  await archive.getByRole('button', { name: 'Reset filters', exact: true }).click();
+  await expect(links).toHaveCount(0);
+  await expect(archive.getByText('Nothing in the archive matches that search.')).toBeVisible();
+  await archive.getByRole('button', { name: 'Show all playlists', exact: true }).click();
+  await expect(search).toHaveValue('');
+  await expect(search).toBeFocused();
+  await expect(links).toHaveCount(4);
   await expect(count).toHaveText('4 playlists');
   await expect(page).toHaveURL(new RegExp(`${playlistPath(readingPlaylist.id)}$`));
   await expect(page.getByRole('button', { name: 'Play playback', exact: true })).toBeVisible();
@@ -156,7 +186,7 @@ test('keeps tools fixed and reveals the selected row after deep links and histor
   const archive = await openArchive(page, playlists, selectedPlaylist.id);
   const results = archive.locator('.archive-results');
   const tools = archive.locator('.archive-tools');
-  const count = archive.locator('.archive-count');
+  const search = tools.getByRole('searchbox', { name: 'Search playlists and tracks' });
   await expect.poll(async () => results.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   const selectedLink = archive.locator('.archive-playlist-link[aria-current="page"]');
   const resultsBounds = await results.boundingBox();
@@ -165,10 +195,10 @@ test('keeps tools fixed and reveals the selected row after deep links and histor
   expect(selectedBounds!.y + selectedBounds!.height).toBeLessThanOrEqual(resultsBounds!.y + resultsBounds!.height);
 
   const toolsBefore = await tools.boundingBox();
-  const countBefore = await count.boundingBox();
+  const searchBefore = await search.boundingBox();
   await results.evaluate((element) => { element.scrollTop = 0; });
   expect(await tools.boundingBox()).toEqual(toolsBefore);
-  expect(await count.boundingBox()).toEqual(countBefore);
+  expect(await search.boundingBox()).toEqual(searchBefore);
   await archive.locator(`[data-playlist-id="${playlists[0].id}"]`).click();
   await expect(page).toHaveURL(new RegExp(`${playlistPath(playlists[0].id)}$`));
   await page.goBack();

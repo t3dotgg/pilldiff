@@ -78,8 +78,6 @@ function MusicWorkspace({
     : playlists.find((playlist) => playlist.id === routeParams?.playlistId);
   const playlistNotFound = !selectedPlaylist && path !== '/';
   const [search, setSearch] = useState('');
-  const [year, setYear] = useState('');
-  const [category, setCategory] = useState('');
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [browseOrders, setBrowseOrders] = useState<Record<string, PlaybackOrder>>({});
   const youtubeHostRef = useRef<HTMLDivElement>(null);
@@ -142,12 +140,6 @@ function MusicWorkspace({
     }
   };
 
-  const clearFilters = () => {
-    setSearch('');
-    setYear('');
-    setCategory('');
-  };
-
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -190,18 +182,13 @@ function MusicWorkspace({
           playlists={playlists}
           selectedPlaylistId={selectedPlaylist?.id ?? ''}
           search={search}
-          year={year}
-          category={category}
           open={archiveOpen}
           onSearch={setSearch}
-          onYear={setYear}
-          onCategory={setCategory}
           onSelect={() => {
             setArchiveOpen(false);
             window.scrollTo({ top: 0, behavior: 'instant' });
           }}
           onClose={() => setArchiveOpen(false)}
-          onClear={clearFilters}
         />
         <main className="listening-room">
           {selectedPlaylist ? (
