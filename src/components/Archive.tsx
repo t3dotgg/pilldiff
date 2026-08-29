@@ -1,4 +1,5 @@
-import { ExternalLink, MessageSquareText, Search, X } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { ExternalLink, Search, X } from 'lucide-react';
 import { Link } from 'wouter';
 import type { Playlist } from '../../shared/types';
 import { playlistPath } from '../navigation';
@@ -18,13 +19,6 @@ interface ArchiveProps {
   onClear: () => void;
 }
 
-function providerCounts(playlist: Playlist): { youtube: number; soundcloud: number } {
-  return playlist.tracks.reduce(
-    (counts, track) => ({ ...counts, [track.provider]: counts[track.provider] + 1 }),
-    { youtube: 0, soundcloud: 0 },
-  );
-}
-
 export function Archive({
   playlists,
   selectedPlaylistId,
@@ -39,6 +33,7 @@ export function Archive({
   onClose,
   onClear,
 }: ArchiveProps) {
+  const resultsRef = useRef<HTMLDivElement>(null);
   const years = [...new Set(playlists.map((playlist) => playlist.year))].sort(
     (firstYear, secondYear) => secondYear - firstYear,
   );
@@ -65,7 +60,27 @@ export function Archive({
     return searchable.includes(normalizedSearch);
   });
   const hasFilters = Boolean(search || year || category);
-  let renderedYear: number | undefined;
+  const groups = new Map<number, Playlist[]>();
+  for (const playlist of filtered) {
+    const group = groups.get(playlist.year) ?? [];
+    group.push(playlist);
+    groups.set(playlist.year, group);
+  }
+  const yearGroups = [...groups.entries()].sort(([firstYear], [secondYear]) => secondYear - firstYear);
+
+  useEffect(() => {
+    const results = resultsRef.current;
+    const selected = results?.querySelector<HTMLElement>('.archive-playlist-link[aria-current="page"]');
+    if (!results || !selected) {
+      return;
+    }
+    const viewportTop = results.getBoundingClientRect().top + results.clientTop;
+    const selectedBounds = selected.getBoundingClientRect();
+    if (selectedBounds.top < viewportTop || selectedBounds.bottom > viewportTop + results.clientHeight) {
+      const contextOffset = Math.max(0, (results.clientHeight - selectedBounds.height) * 0.3);
+      results.scrollTop += selectedBounds.top - viewportTop - contextOffset;
+    }
+  }, [selectedPlaylistId, open]);
 
   return (
     <>
@@ -82,20 +97,23 @@ export function Archive({
           </button>
         </div>
         <div className="archive-tools">
-          <div className="archive-label">The archive</div>
-          <label className="search-field">
-            <Search size={17} aria-hidden="true" />
-            <span className="sr-only">Search playlists and tracks</span>
-            <input
-              type="search"
-              value={search}
-              placeholder="Search playlists or tracks"
-              onChange={(event) => onSearch(event.target.value)}
-            />
+          <h2 className="archive-label">The archive</h2>
+          <label className="archive-field">
+            <span className="archive-field-label">Search</span>
+            <span className="search-field">
+              <Search size={16} aria-hidden="true" />
+              <input
+                type="search"
+                value={search}
+                aria-label="Search playlists and tracks"
+                placeholder="Search playlists or tracks"
+                onChange={(event) => onSearch(event.target.value)}
+              />
+            </span>
           </label>
           <div className="filter-row">
-            <label>
-              <span className="sr-only">Filter by year</span>
+            <label className="archive-field">
+              <span className="archive-field-label">Year</span>
               <select value={year} onChange={(event) => onYear(event.target.value)} aria-label="Filter by year">
                 <option value="">All years</option>
                 {years.map((availableYear) => (
@@ -103,8 +121,8 @@ export function Archive({
                 ))}
               </select>
             </label>
-            <label>
-              <span className="sr-only">Filter by category</span>
+            <label className="archive-field">
+              <span className="archive-field-label">Series</span>
               <select
                 value={category}
                 onChange={(event) => onCategory(event.target.value)}
@@ -117,56 +135,54 @@ export function Archive({
               </select>
             </label>
           </div>
-        </div>
-        <div className="archive-results" aria-live="polite">
           <div className="archive-count">
-            <span>{filtered.length} {filtered.length === 1 ? 'playlist' : 'playlists'}</span>
+            <span role="status">{filtered.length} {filtered.length === 1 ? 'playlist' : 'playlists'}</span>
             {hasFilters ? <button type="button" onClick={onClear}>Clear</button> : null}
           </div>
+        </div>
+        <div className="archive-results" ref={resultsRef}>
           {filtered.length === 0 ? (
             <div className="empty-filter">
               <p>Nothing in the archive matches that search.</p>
               <button className="text-button" type="button" onClick={onClear}>Reset filters</button>
             </div>
           ) : (
-            filtered.map((playlist) => {
-              const showYear = renderedYear !== playlist.year;
-              renderedYear = playlist.year;
-              const counts = providerCounts(playlist);
-              const notesCount = playlist.tracks.filter((track) => track.description).length;
-              return (
-                <div key={playlist.id}>
-                  {showYear ? <div className="year-divider">{playlist.year}</div> : null}
-                  <div className={`archive-card ${selectedPlaylistId === playlist.id ? 'is-selected' : ''}`}>
-                    <Link
-                      className="archive-playlist-link"
-                      href={playlistPath(playlist.id)}
-                      data-playlist-id={playlist.id}
-                      aria-current={selectedPlaylistId === playlist.id ? 'page' : undefined}
-                      onClick={(event) => {
-                        if (selectedPlaylistId === playlist.id) {
-                          event.preventDefault();
-                        }
-                        onSelect();
-                      }}
-                    >
-                      <span className="archive-card-title">{playlist.shortTitle || playlist.title}</span>
-                      <span className="archive-card-meta">
-                        {playlist.category || 'playlist'} · {playlist.tracks.length} entries
-                      </span>
-                      <span className="provider-tally" aria-label={`${counts.youtube} YouTube and ${counts.soundcloud} SoundCloud entries${notesCount ? `, ${notesCount} with notes` : ''}`}>
-                        {counts.youtube > 0 ? <span className="youtube-dot">YT {counts.youtube}</span> : null}
-                        {counts.soundcloud > 0 ? <span className="soundcloud-dot">SC {counts.soundcloud}</span> : null}
-                        {notesCount > 0 ? <span className="notes-tally"><MessageSquareText size={10} aria-hidden="true" /> {notesCount} notes</span> : null}
-                      </span>
-                    </Link>
-                    <a className="archive-source-link" href={playlist.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${playlist.title} on billdifferen`}>
-                      <ExternalLink size={15} />
-                    </a>
-                  </div>
-                </div>
-              );
-            })
+            yearGroups.map(([groupYear, groupPlaylists]) => (
+              <section className="archive-year" key={groupYear} aria-label={`${groupYear} playlists`}>
+                <h3 className="year-divider">{groupYear}</h3>
+                <ul className="archive-list">
+                  {groupPlaylists.map((playlist) => {
+                    const notesCount = playlist.tracks.filter((track) => track.description).length;
+                    return (
+                      <li className={`archive-card ${selectedPlaylistId === playlist.id ? 'is-selected' : ''}`} key={playlist.id}>
+                        <Link
+                          className="archive-playlist-link"
+                          href={playlistPath(playlist.id)}
+                          data-playlist-id={playlist.id}
+                          aria-current={selectedPlaylistId === playlist.id ? 'page' : undefined}
+                          onClick={(event) => {
+                            if (selectedPlaylistId === playlist.id) {
+                              event.preventDefault();
+                            }
+                            onSelect();
+                          }}
+                        >
+                          <span className="archive-card-title">{playlist.shortTitle || playlist.title}</span>
+                          <span className="archive-card-meta">
+                            <span>{playlist.category || 'playlist'}</span>
+                            <span>{playlist.tracks.length} {playlist.tracks.length === 1 ? 'entry' : 'entries'}</span>
+                            {notesCount > 0 ? <span>{notesCount} {notesCount === 1 ? 'note' : 'notes'}</span> : null}
+                          </span>
+                        </Link>
+                        <a className="archive-source-link" href={playlist.sourceUrl} target="_blank" rel="noreferrer" aria-label={`Open ${playlist.title} on billdifferen`}>
+                          <ExternalLink size={15} aria-hidden="true" />
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))
           )}
         </div>
       </aside>
