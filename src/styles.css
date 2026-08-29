@@ -107,6 +107,7 @@ button:disabled {
   top: 0;
   display: flex;
   height: var(--header-height);
+  gap: 16px;
   padding: 0 28px;
   align-items: center;
   justify-content: space-between;
@@ -118,7 +119,9 @@ button:disabled {
 .brand-lockup,
 .topbar-actions,
 .topbar-actions a,
-.topbar-actions button {
+.topbar-actions button,
+.creator-links,
+.creator-links a {
   display: flex;
   align-items: center;
 }
@@ -151,6 +154,14 @@ button:disabled {
 
 .topbar-actions {
   gap: 12px;
+  margin-left: auto;
+}
+
+.creator-links {
+  flex-shrink: 0;
+  gap: 8px;
+  padding-left: 16px;
+  border-left: 1px solid var(--border);
 }
 
 .snapshot-date {
@@ -160,7 +171,8 @@ button:disabled {
 }
 
 .topbar-actions a,
-.topbar-actions button {
+.topbar-actions button,
+.creator-links a {
   min-height: 36px;
   gap: 8px;
   padding: 0 8px;
@@ -170,13 +182,27 @@ button:disabled {
   background: transparent;
   font-size: 11px;
   text-decoration: none;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .topbar-actions a:hover,
-.topbar-actions button:hover {
+.topbar-actions button:hover,
+.creator-links a:hover {
   color: var(--text);
   background: var(--surface-raised);
+}
+
+.creator-links .creator-support {
+  padding: 0 12px;
+  color: var(--background);
+  background: var(--accent);
+  font-weight: 650;
+}
+
+.creator-links .creator-support:hover {
+  color: var(--background);
+  background: #ff847b;
 }
 
 .topbar-actions .archive-toggle {
@@ -1389,6 +1415,13 @@ input[type="range"] {
   }
 }
 
+@media (max-width: 1200px) {
+  .brand-tagline,
+  .snapshot-date {
+    display: none;
+  }
+}
+
 @media (max-width: 1050px) {
   .transport {
     grid-template-columns: minmax(150px, 1fr) minmax(280px, 1.3fr);
@@ -1408,8 +1441,6 @@ input[type="range"] {
     padding: 0 24px;
   }
 
-  .brand-tagline,
-  .snapshot-date,
   .topbar-actions > a {
     display: none;
   }
@@ -1480,9 +1511,34 @@ input[type="range"] {
   }
 }
 
+@media (max-width: 700px) {
+  :root {
+    --header-height: 96px;
+  }
+
+  .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 52px 44px;
+    gap: 0;
+  }
+
+  .creator-links {
+    grid-column: 1 / -1;
+    align-self: stretch;
+    padding: 0 0 8px;
+    border: 0;
+  }
+
+  .creator-links a {
+    min-height: 32px;
+    flex: 1;
+    justify-content: center;
+  }
+}
+
 @media (max-width: 600px) {
   :root {
-    --header-height: 64px;
     --transport-height: 124px;
   }
 

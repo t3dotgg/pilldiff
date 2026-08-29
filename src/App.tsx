@@ -1,4 +1,4 @@
-import { AudioLines, ExternalLink, LoaderCircle, Menu, RefreshCw } from 'lucide-react';
+import { AudioLines, ExternalLink, Heart, LoaderCircle, Menu, RefreshCw } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useRoute } from 'wouter';
 import type { Catalog, PlaybackOrder, Playlist } from '../shared/types';
@@ -171,6 +171,26 @@ function MusicWorkspace({
             <span>{checking ? 'Checking' : 'Check for updates'}</span>
           </button>
         </div>
+        <nav className="creator-links" aria-label="Follow and support Bill">
+          <a
+            href="https://x.com/billdifferen"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Follow Bill on Twitter"
+          >
+            Twitter <ExternalLink size={14} aria-hidden="true" />
+          </a>
+          <a
+            className="creator-support"
+            href="https://ko-fi.com/billdifferen"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Support Bill on Ko-fi"
+            title="Support Bill on Ko-fi"
+          >
+            <Heart size={14} aria-hidden="true" /> Support Bill
+          </a>
+        </nav>
       </header>
       {warning ? (
         <div className="catalog-warning" role="status">
