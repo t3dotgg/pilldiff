@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Play capsule — pilldiff favicon proposal</title>
+  <g transform="rotate(-42 32 32)">
+    <rect x="4" y="16" width="56" height="32" rx="16" fill="#F3F2F0"/>
+    <path d="M32 16h12a16 16 0 0 1 0 32H32V16Z" fill="#F16B62"/>
+    <path d="M32 16v32" stroke="#111113" stroke-width="4"/>
+    <rect x="4" y="16" width="56" height="32" rx="16" stroke="#111113" stroke-width="4"/>
+  </g>
+  <path d="m37 19 11 6-11 6V19Z" fill="#111113"/>
+</svg>

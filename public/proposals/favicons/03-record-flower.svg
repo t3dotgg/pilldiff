@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Record flower — pilldiff favicon proposal</title>
+  <path d="M32 11C42-3 58 10 49 23c17 2 17 22 0 24 8 15-10 23-17 8-8 15-26 7-17-8-17-2-17-22 0-24C6 10 22-3 32 11Z" fill="#F16B62" stroke="#111113" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="32" cy="33" r="15" fill="#111113"/>
+  <circle cx="32" cy="33" r="7" fill="#F3F2F0"/>
+  <circle cx="32" cy="33" r="2.5" fill="#111113"/>
+</svg>

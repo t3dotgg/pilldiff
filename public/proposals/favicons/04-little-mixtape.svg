@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Little mixtape — pilldiff favicon proposal</title>
+  <rect x="3" y="10" width="58" height="44" rx="9" fill="#F3F2F0" stroke="#111113" stroke-width="4"/>
+  <rect x="11" y="18" width="42" height="20" rx="10" fill="#F16B62"/>
+  <circle cx="22" cy="28" r="7" fill="#111113"/>
+  <circle cx="42" cy="28" r="7" fill="#111113"/>
+  <circle cx="22" cy="28" r="2.5" fill="#F3F2F0"/>
+  <circle cx="42" cy="28" r="2.5" fill="#F3F2F0"/>
+  <path d="m18 52 5-10h18l5 10H18Z" fill="#111113"/>
+</svg>
