@@ -744,6 +744,11 @@ button:disabled {
   background: #181212;
 }
 
+.track-list > li:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
 .track-list > li.is-current::before {
   position: absolute;
   inset: 13px auto 13px 0;
@@ -757,6 +762,8 @@ button:disabled {
   grid-template-columns: 32px minmax(0, 1fr) auto 72px 20px;
   min-width: 0;
   min-height: 65px;
+  scroll-margin-top: calc(var(--header-height) + 20px);
+  scroll-margin-bottom: calc(var(--transport-height) + 20px);
   padding: 12px 4px;
   gap: 9px;
   align-items: center;
@@ -1177,11 +1184,25 @@ button:disabled {
 }
 
 .transport-track div,
-.transport-context > div {
+.transport-context > div,
+.transport-link {
   display: flex;
   min-width: 0;
   gap: 5px;
   flex-direction: column;
+}
+
+.transport-link {
+  border-radius: 3px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.transport-link:hover strong,
+.transport-link:focus-visible strong {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .transport-track strong,
@@ -1278,7 +1299,8 @@ input[type="range"] {
   justify-content: flex-end;
 }
 
-.transport-context > div {
+.transport-context > div,
+.transport-context > .transport-link {
   text-align: right;
 }
 

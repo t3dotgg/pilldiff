@@ -1,5 +1,8 @@
 import { LoaderCircle, Pause, Play, SkipBack, SkipForward, Volume2 } from 'lucide-react';
+import type { MouseEvent } from 'react';
+import { Link } from 'wouter';
 import type { Playlist, Track } from '../../shared/types';
+import { playlistPath } from '../navigation';
 import type { PlaybackSession } from '../playback/types';
 
 interface TransportProps {
@@ -10,6 +13,7 @@ interface TransportProps {
   queueTotal: number;
   canPrevious: boolean;
   canNext: boolean;
+  onShowCurrentTrack: () => void;
   onPrevious: () => void;
   onTogglePlay: () => void;
   onNext: () => void;
@@ -35,6 +39,7 @@ export function Transport({
   queueTotal,
   canPrevious,
   canNext,
+  onShowCurrentTrack,
   onPrevious,
   onTogglePlay,
   onNext,
@@ -45,14 +50,42 @@ export function Transport({
   const isPlaying = session?.status === 'playing' || session?.status === 'buffering' || isPending;
   const progress = session?.progress ?? 0;
   const duration = session?.duration ?? 0;
+  const trackTitle = track?.title || track?.label || 'Nothing cued';
+  const playlistTitle = playlist?.shortTitle || playlist?.title || 'No playlist';
+  const trackLabel = (
+    <>
+      <strong>{trackTitle}</strong>
+      <span>{track?.artist || playlist?.shortTitle || 'Choose a playlist from the archive'}</span>
+    </>
+  );
+  const playlistLabel = (
+    <>
+      <strong>{playlistTitle}</strong>
+      <span>
+        {queueIndex >= 0 ? `${queueIndex + 1} of ${queueTotal}` : '—'} · {session?.order === 'reverse' ? 'reverse' : 'blog order'}
+      </span>
+    </>
+  );
+  const showCurrentTrack = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    onShowCurrentTrack();
+  };
+
   return (
     <footer className="transport" aria-label="Playback controls">
       <div className="transport-track">
         <span className={`transport-provider ${track?.provider ?? 'idle'}`} />
-        <div>
-          <strong>{track?.title || track?.label || 'Nothing cued'}</strong>
-          <span>{track?.artist || playlist?.shortTitle || 'Choose a playlist from the archive'}</span>
-        </div>
+        {playlist && track ? (
+          <Link
+            className="transport-link"
+            href={playlistPath(playlist.id)}
+            onClick={showCurrentTrack}
+            aria-label={`Show current track: ${trackTitle}`}
+            title={`Show current track in ${playlistTitle}`}
+          >
+            {trackLabel}
+          </Link>
+        ) : <div>{trackLabel}</div>}
       </div>
       <div className="transport-center">
         <div className="transport-buttons">
@@ -89,12 +122,17 @@ export function Transport({
         </div>
       </div>
       <div className="transport-context">
-        <div>
-          <strong>{playlist?.shortTitle || 'No playlist'}</strong>
-          <span>
-            {queueIndex >= 0 ? `${queueIndex + 1} of ${queueTotal}` : '—'} · {session?.order === 'reverse' ? 'reverse' : 'blog order'}
-          </span>
-        </div>
+        {playlist && track ? (
+          <Link
+            className="transport-link"
+            href={playlistPath(playlist.id)}
+            onClick={showCurrentTrack}
+            aria-label={`Show playing playlist: ${playlistTitle}`}
+            title={`Show current track in ${playlistTitle}`}
+          >
+            {playlistLabel}
+          </Link>
+        ) : <div>{playlistLabel}</div>}
         <label className="volume-control">
           <Volume2 size={17} />
           <span className="sr-only">Volume</span>

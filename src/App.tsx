@@ -1,5 +1,5 @@
 import { AudioLines, ExternalLink, Heart, LoaderCircle, Menu, RefreshCw } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useRoute } from 'wouter';
 import type { Catalog, PlaybackOrder, Playlist } from '../shared/types';
 import { Archive } from './components/Archive';
@@ -79,6 +79,7 @@ function MusicWorkspace({
   const playlistNotFound = !selectedPlaylist && path !== '/';
   const [search, setSearch] = useState('');
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [revealPlaylistId, setRevealPlaylistId] = useState<string>();
   const [browseOrders, setBrowseOrders] = useState<Record<string, PlaybackOrder>>({});
   const youtubeHostRef = useRef<HTMLDivElement>(null);
   const soundCloudHostRef = useRef<HTMLDivElement>(null);
@@ -102,6 +103,18 @@ function MusicWorkspace({
     playback.session && playback.session.playlistId === selectedPlaylist?.id
       ? playback.session.order
       : browseOrders[selectedPlaylist?.id ?? ''] ?? 'original';
+
+  useLayoutEffect(() => {
+    if (!revealPlaylistId || path !== playlistPath(revealPlaylistId)) {
+      return;
+    }
+    const currentRow = document.querySelector<HTMLElement>('.track-list > li.is-current');
+    const heading = document.querySelector<HTMLElement>('#playlist-title, .playlist-not-found h1');
+    const scrollTarget = currentRow?.querySelector<HTMLElement>('.track-main') ?? heading;
+    scrollTarget?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
+    (currentRow ?? heading)?.focus({ preventScroll: true });
+    setRevealPlaylistId(undefined);
+  }, [path, revealPlaylistId]);
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
@@ -138,6 +151,19 @@ function MusicWorkspace({
     if (playback.session?.playlistId === selectedPlaylist.id) {
       playback.setOrder(order);
     }
+  };
+
+  const showCurrentTrack = () => {
+    const playlist = playback.playingPlaylist;
+    if (!playlist || !playback.currentTrack) {
+      return;
+    }
+    setArchiveOpen(false);
+    const destination = playlistPath(playlist.id);
+    if (path !== destination) {
+      navigate(destination);
+    }
+    setRevealPlaylistId(playlist.id);
   };
 
   return (
@@ -225,7 +251,7 @@ function MusicWorkspace({
           ) : playlistNotFound ? (
             <div className="empty-catalog playlist-not-found">
               <AppMark />
-              <h1>Playlist not found.</h1>
+              <h1 tabIndex={-1}>Playlist not found.</h1>
               <p>This link does not match a playlist in the current archive. It may have been removed.</p>
               <Link className="primary-button" href={latestPlaylist ? playlistPath(latestPlaylist.id) : '/'}>
                 {latestPlaylist ? 'Browse latest playlist' : 'Back to archive'}
@@ -261,6 +287,7 @@ function MusicWorkspace({
         queueTotal={playback.queueTotal}
         canPrevious={playback.canPrevious}
         canNext={playback.canNext}
+        onShowCurrentTrack={showCurrentTrack}
         onPrevious={playback.previous}
         onTogglePlay={playback.togglePlay}
         onNext={playback.next}

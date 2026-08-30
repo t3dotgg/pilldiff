@@ -62,7 +62,7 @@ export function PlaylistView({
         <Artwork playlist={playlist} />
         <div className="playlist-intro">
           <div className="eyebrow">{playlist.category || 'playlist'} <span>/</span> {playlist.year}</div>
-          <h1 id="playlist-title" aria-label={playlist.title}>{playlist.shortTitle || playlist.title}</h1>
+          <h1 id="playlist-title" aria-label={playlist.title} tabIndex={-1}>{playlist.shortTitle || playlist.title}</h1>
           {playlist.shortTitle !== playlist.title ? <p className="playlist-original-title">{playlist.title}</p> : null}
           <div className="playlist-meta">
             <span>{dateLabel(playlist.publishedAt)}</span>
@@ -114,7 +114,12 @@ export function PlaylistView({
           const labels = displayTrack(track);
           const isCurrent = isActivePlaylist && currentTrack?.id === track.id;
           return (
-            <li key={track.id} className={isCurrent ? 'is-current' : ''}>
+            <li
+              key={track.id}
+              className={isCurrent ? 'is-current' : ''}
+              aria-current={isCurrent ? 'true' : undefined}
+              tabIndex={-1}
+            >
               <button
                 className="track-main"
                 type="button"

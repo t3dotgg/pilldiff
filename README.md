@@ -4,6 +4,8 @@ An unofficial, local-first player for the playlists and music posts published at
 
 The interface takes its black, white, and red palette from the blog, with the original post artwork as a wide banner. Entries with commentary have expandable **Bill’s notes** in the tracklist; the current song's notes also appear beneath its source player. The archive marks playlists that contain notes. Not every post has them, particularly the recent link-only monthly lists.
 
+Click the song or playlist label in the bottom player to return to the playing playlist and reveal the current track. This preserves playback, progress, and order, and works even when you are already viewing that playlist.
+
 ## Run locally
 
 Requires Node.js 24.x.
