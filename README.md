@@ -42,6 +42,12 @@ PLAYWRIGHT_CHANNEL=chrome npm run test:live
 
 Set `PLAYWRIGHT_BASE_URL` when the app is not on `http://127.0.0.1:5173`, or set `PILLDIFF_LIVE_HANDOFF=0` to skip its near-end handoff attempt.
 
+## Favicon
+
+The approved Blackletter B lives in `public/favicon.svg`. The app also includes a 16/32/48-pixel `public/favicon.ico` and an opaque 180-pixel `public/apple-touch-icon.png`, both generated from that SVG.
+
+After editing the SVG, regenerate the raster assets with `npm run icons` (or `PLAYWRIGHT_CHANNEL=chrome npm run icons` for system Chrome), then commit all three assets. This uses the existing Playwright tooling and is not part of the production build.
+
 ## How it works
 
 - `server/importer.ts` reads every page of the fixed Blogger JSON feed, treats native embeds and ranked link-only entries as the playlist, pairs cross-provider headings with their embed, and excludes posts with no supported tracks.
