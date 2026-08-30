@@ -1,6 +1,8 @@
 import { AlertCircle, AudioLines, ExternalLink, LoaderCircle, Play, RotateCcw, SkipForward } from 'lucide-react';
 import type { RefObject } from 'react';
+import { Link } from 'wouter';
 import type { Track } from '../../shared/types';
+import { playlistPath } from '../navigation';
 import type { PlaybackSession } from '../playback/types';
 import { TrackNotes } from './TrackNotes';
 
@@ -10,6 +12,7 @@ interface EmbedStageProps {
   sourceUrl?: string;
   youtubeHostRef: RefObject<HTMLDivElement | null>;
   soundCloudHostRef: RefObject<HTMLDivElement | null>;
+  onShowCurrentTrack: () => void;
   onContinue: () => void;
   onRetry: () => void;
   onSkip: () => void;
@@ -21,11 +24,19 @@ export function EmbedStage({
   sourceUrl,
   youtubeHostRef,
   soundCloudHostRef,
+  onShowCurrentTrack,
   onContinue,
   onRetry,
   onSkip,
 }: EmbedStageProps) {
   const showNotice = session?.notice && ['blocked', 'error', 'ended'].includes(session.status);
+  const trackLabel = track ? (
+    <>
+      <strong>{track.title || track.label}</strong>
+      {track.artist ? <span>{track.artist}</span> : null}
+    </>
+  ) : null;
+
   return (
     <aside className="embed-stage" aria-label="Now playing source">
       <div className="embed-heading">
@@ -79,10 +90,20 @@ export function EmbedStage({
       {track ? (
         <div className="embed-caption">
           <span className={`provider-line ${track.provider}`} />
-          <div>
-            <strong>{track.title || track.label}</strong>
-            {track.artist ? <span>{track.artist}</span> : null}
-          </div>
+          {session ? (
+            <Link
+              className="embed-track-link"
+              href={playlistPath(session.playlistId)}
+              onClick={(event) => {
+                event.preventDefault();
+                onShowCurrentTrack();
+              }}
+              aria-label={`Show current track: ${track.title || track.label}`}
+              title="Show current track in its playlist"
+            >
+              {trackLabel}
+            </Link>
+          ) : <div>{trackLabel}</div>}
         </div>
       ) : null}
       {track?.description ? (

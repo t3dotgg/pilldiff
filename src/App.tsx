@@ -273,6 +273,7 @@ function MusicWorkspace({
             sourceUrl={playback.playingPlaylist?.sourceUrl}
             youtubeHostRef={youtubeHostRef}
             soundCloudHostRef={soundCloudHostRef}
+            onShowCurrentTrack={showCurrentTrack}
             onContinue={playback.togglePlay}
             onRetry={playback.retryCurrent}
             onSkip={playback.skipCurrent}

@@ -60,6 +60,8 @@ for (const scenario of [
   { provider: 'soundcloud', label: 'playlist', order: 'original', position: 29 },
   { provider: 'youtube', label: 'playlist', order: 'reverse', position: 28 },
   { provider: 'soundcloud', label: 'track', order: 'reverse', position: 29 },
+  { provider: 'youtube', label: 'source', order: 'original', position: 28 },
+  { provider: 'soundcloud', label: 'source', order: 'reverse', position: 29 },
 ] as const) {
   test(`returns from the ${scenario.label} label to ${scenario.provider} in ${scenario.order} order`, async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -74,10 +76,11 @@ for (const scenario of [
     await clearSdkCalls(page);
     await selectPlaylist(page, collectionPlaylist.shortTitle);
     const transport = page.getByLabel('Playback controls');
-    const link = transport.getByRole('link', {
-      name: scenario.label === 'track'
-        ? `Show current track: ${track.title}`
-        : `Show playing playlist: ${longPlaylist.shortTitle}`,
+    const linkRegion = scenario.label === 'source' ? page.getByLabel('Now playing source') : transport;
+    const link = linkRegion.getByRole('link', {
+      name: scenario.label === 'playlist'
+        ? `Show playing playlist: ${longPlaylist.shortTitle}`
+        : `Show current track: ${track.title}`,
       exact: true,
     });
     await expect(link).toHaveAttribute('href', playlistPath(longPlaylist.id));
@@ -113,8 +116,13 @@ for (const scenario of [
   });
 }
 
-for (const width of [390, 320]) {
-  test(`returns to the playing track above the player at ${width}px`, async ({ page }) => {
+for (const { width, region } of [
+  { width: 390, region: 'Playback controls' },
+  { width: 320, region: 'Playback controls' },
+  { width: 390, region: 'Now playing source' },
+  { width: 320, region: 'Now playing source' },
+]) {
+  test(`returns from ${region} to the playing track above the player at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await installAppHarness(page, { catalog });
     await openCatalog(page);
@@ -122,7 +130,7 @@ for (const width of [390, 320]) {
     await playTrack(page, track);
     await selectPlaylist(page, collectionPlaylist.shortTitle);
     await clearSdkCalls(page);
-    await page.getByRole('link', { name: `Show current track: ${track.title}`, exact: true }).click();
+    await page.getByLabel(region).getByRole('link', { name: `Show current track: ${track.title}`, exact: true }).click();
     await expect(page.getByRole('complementary', { name: 'Playlist archive' })).toBeHidden();
     await expectRevealedTrack(page, track);
     await waitForProviderPlaying(page, track.provider);
@@ -136,8 +144,10 @@ test('reveals unstarted and paused tracks without starting or seeking playback',
   await installAppHarness(page, { catalog });
   await openCatalog(page);
   await clearSdkCalls(page);
-  await page.getByRole('link', { name: `Show current track: ${longPlaylist.tracks[0].title}`, exact: true }).click();
-  await expectRevealedTrack(page, longPlaylist.tracks[0]);
+  for (const region of ['Playback controls', 'Now playing source']) {
+    await page.getByLabel(region).getByRole('link', { name: `Show current track: ${longPlaylist.tracks[0].title}`, exact: true }).click();
+    await expectRevealedTrack(page, longPlaylist.tracks[0]);
+  }
   await expect(page.getByLabel('Playback controls').getByRole('button', { name: 'Play playback', exact: true })).toBeVisible();
   expect((await sdkSnapshot(page)).calls).toHaveLength(0);
 
@@ -147,7 +157,7 @@ test('reveals unstarted and paused tracks without starting or seeking playback',
   await expect.poll(async () => (await latestInstance(page, track.provider))?.playing).toBe(false);
   await selectPlaylist(page, collectionPlaylist.shortTitle);
   await clearSdkCalls(page);
-  const link = page.getByRole('link', { name: `Show current track: ${track.title}`, exact: true });
+  const link = page.getByLabel('Now playing source').getByRole('link', { name: `Show current track: ${track.title}`, exact: true });
   await link.focus();
   await link.press('Enter');
   await expectRevealedTrack(page, track);
@@ -183,7 +193,7 @@ for (const removed of ['track', 'playlist']) {
     } else {
       await expect(page.locator('.archive-playlist-link')).toHaveCount(1);
     }
-    await page.getByRole('link', { name: `Show current track: ${track.title}`, exact: true }).click();
+    await page.getByLabel('Now playing source').getByRole('link', { name: `Show current track: ${track.title}`, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`${playlistPath(longPlaylist.id)}$`));
     await expect(page.getByRole('heading', { name: removed === 'track' ? updatedPlaylist.title : 'Playlist not found.', exact: true }))
       .toBeFocused();
@@ -196,8 +206,13 @@ for (const removed of ['track', 'playlist']) {
   });
 }
 
-for (const action of ['modifier click', 'middle click']) {
-  test(`preserves native ${action} behavior on the playing track link`, async ({ page, context }) => {
+for (const { action, region } of [
+  { action: 'modifier click', region: 'Playback controls' },
+  { action: 'middle click', region: 'Playback controls' },
+  { action: 'modifier click', region: 'Now playing source' },
+  { action: 'middle click', region: 'Now playing source' },
+]) {
+  test(`preserves native ${action} behavior on the ${region} track link`, async ({ page, context }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await installAppHarness(page, { catalog });
     await openCatalog(page);
@@ -211,7 +226,7 @@ for (const action of ['modifier click', 'middle click']) {
       body: '<!doctype html><title>Playing playlist destination</title>',
     }));
     const tabPromise = context.waitForEvent('page');
-    const link = page.getByRole('link', { name: `Show current track: ${track.title}`, exact: true });
+    const link = page.getByLabel(region).getByRole('link', { name: `Show current track: ${track.title}`, exact: true });
     if (action === 'modifier click') {
       await link.click({ modifiers: ['ControlOrMeta'] });
     } else {
@@ -236,4 +251,5 @@ test('keeps idle playback labels noninteractive when no playlist is available', 
   const transport = page.getByLabel('Playback controls');
   await expect(transport.getByText('Nothing cued', { exact: true })).toBeVisible();
   await expect(transport.getByRole('link')).toHaveCount(0);
+  await expect(page.getByLabel('Now playing source').getByRole('link')).toHaveCount(0);
 });
