@@ -197,7 +197,17 @@ function MusicWorkspace({
             <span>{checking ? 'Checking' : 'Check for updates'}</span>
           </button>
         </div>
-        <nav className="creator-links" aria-label="Follow and support Bill">
+        <nav className="creator-links" aria-label="Project and creator links">
+          <a
+            className="github-link"
+            href="https://github.com/t3dotgg/pilldiff"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="View pilldiff on GitHub"
+            title="View pilldiff on GitHub"
+          >
+            <img src="/github.svg" width={20} height={20} alt="" />
+          </a>
           <a
             href="https://x.com/billdifferen"
             target="_blank"
