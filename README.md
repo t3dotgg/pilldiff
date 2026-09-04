@@ -2,6 +2,8 @@
 
 An unofficial, local-first player for the playlists and music posts published at [billdifferen](https://billdifferen.blogspot.com/). It keeps each post's original document order, supports reverse playback, and hands tracks between official YouTube and SoundCloud embeds. Bandcamp entries are counted but skipped for now.
 
+[Use the player](https://pilldiff.t3.gg/) or run it locally. The source code is available under the [MIT License](LICENSE).
+
 The interface takes its black, white, and red palette from the blog, with the original post artwork as a wide banner. Entries with commentary have expandable **Bill’s notes** in the tracklist; the current song's notes also appear beneath its source player. The archive marks playlists that contain notes. Not every post has them, particularly the recent link-only monthly lists.
 
 Click the song or playlist label in the bottom player, or the song title beneath the source player, to return to the playing playlist and reveal the current track. This preserves playback, progress, and order, and works even when you are already viewing that playlist.
@@ -81,9 +83,11 @@ The only optional runtime code is `/api/firecrawl`, a small Vercel function that
 
 ### Vercel
 
-Production target: [pilldiff.t3.gg](https://pilldiff.t3.gg/). The private source repository is [t3dotgg/pilldiff](https://github.com/t3dotgg/pilldiff), connected from `main` to the existing `theo-personal/pilldiff` Vercel project. Pushes to `main` automatically start a fresh Blogger import and production build.
+The hosted player is at [pilldiff.t3.gg](https://pilldiff.t3.gg/). The source repository is [t3dotgg/pilldiff](https://github.com/t3dotgg/pilldiff). Pushes to its `main` branch automatically start a fresh Blogger import and production build.
 
-1. Push this repository to GitHub and import it as a Git-connected Vercel project.
+To deploy your own copy:
+
+1. Fork this repository and import your fork as a Git-connected Vercel project.
 2. Vercel reads `vercel.json`, runs `npm run build` with Node 24, and publishes `dist`.
 3. Deploy once with no environment variables if automatic monitoring is not ready yet. The static player and build-time catalog need no credentials.
 4. Open the production URL and test a real YouTube-to-SoundCloud and SoundCloud-to-YouTube transition after an initial click.
@@ -109,3 +113,13 @@ Creating a Firecrawl monitor requires sufficient credits on the Firecrawl accoun
 ### Typeface
 
 The wordmark uses the same UnifrakturMaguntia typeface as the original blog. It is self-hosted, so the interface does not request Google Fonts at runtime. Its SIL Open Font License is included in `public/fonts/OFL.txt`.
+
+## Contributing
+
+Issues and pull requests are welcome. Use the local setup above, keep changes focused, and run `npm test` and `npm run build:snapshot` before submitting a pull request. Run `npm run test:e2e` for changes to the player or interface.
+
+## License
+
+The original source code and project documentation are licensed under the [MIT License](LICENSE), copyright 2026 Theo Browne.
+
+The bundled UnifrakturMaguntia font uses the [SIL Open Font License](public/fonts/OFL.txt). Imported blog text, artwork, music, and other third-party content remain the property of their respective owners and are not covered by this project's MIT license.
