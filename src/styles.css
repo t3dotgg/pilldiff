@@ -98,13 +98,16 @@ button:disabled {
 
 .app-shell {
   min-height: 100vh;
+  padding-top: var(--header-height);
   padding-bottom: var(--transport-height);
 }
 
 .topbar {
-  position: sticky;
+  position: fixed;
   z-index: 40;
   top: 0;
+  right: 0;
+  left: 0;
   display: flex;
   height: var(--header-height);
   gap: 16px;
